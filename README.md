@@ -1,4 +1,4 @@
-# Astra + Flash for Codex
+# Astra Flash Orchestrator
 
 **Astra plans and reviews. DeepSeek Flash implements.**
 
@@ -50,8 +50,8 @@ The installer supports loopback Router URLs using `/v1` or `/_codex-router/<capa
 Download this repository as a ZIP and extract it, or clone it:
 
 ```sh
-git clone https://github.com/ethanplusai/astra-flash-codex.git
-cd astra-flash-codex
+git clone https://github.com/ethanplusai/astra-flash-orchestrator.git
+cd astra-flash-orchestrator
 ```
 
 Run the following commands from that repository folder.

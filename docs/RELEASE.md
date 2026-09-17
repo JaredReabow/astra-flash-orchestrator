@@ -1,6 +1,6 @@
 # GitHub release preparation
 
-Suggested repository name: **astra-flash-codex**
+Suggested repository name: **astra-flash-orchestrator**
 
 Suggested GitHub description:
 

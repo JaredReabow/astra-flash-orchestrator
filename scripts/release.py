@@ -54,7 +54,7 @@ def main():
         version = (ROOT / 'VERSION').read_text().strip()
         if not version or any(c not in '0123456789.-abcdefghijklmnopqrstuvwxyz' for c in version):
             raise SystemExit('Unsafe version.')
-        folder = f'astra-flash-codex-{version}'
+        folder = f'astra-flash-orchestrator-{version}'
         out = ROOT / 'dist' / f'{folder}.zip'
         out.parent.mkdir(exist_ok=True)
         with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as archive:

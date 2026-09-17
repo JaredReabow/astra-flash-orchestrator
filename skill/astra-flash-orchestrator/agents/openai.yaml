@@ -1,0 +1,6 @@
+interface:
+  display_name: "Astra + Flash Orchestrator"
+  short_description: "Astra plans and reviews; Flash builds task bundles."
+  default_prompt: "Use $astra-flash-orchestrator to plan and execute this build with Astra orchestrating and the installed Flash worker implementing."
+policy:
+  allow_implicit_invocation: true

@@ -9,6 +9,19 @@ Use the existing Codex Router, not a second agent CLI or API client. This skill
 provides the workflow; the custom agent and router select the worker model. Do
 not claim routing is verified from these instructions or a worker's self-report.
 
+## Thin-root default
+
+Keep Astra focused on decisions where its judgment has the highest leverage:
+architecture, acceptance criteria, material risk, and final acceptance. After the
+contract is ready, Flash owns repository discovery needed within the brief,
+implementation, testing, debugging, and routine browser/visual QA.
+
+For a normal phase, target this root workflow: one planning batch, one dispatch to
+one worker, one native wait, one batched acceptance review, and one final response.
+This is a workflow shape, not a reason to skip evidence or stop before the result is
+correct. Add Astra work only for a concrete blocker or architecture, security, or
+production-risk concern. Do not create root activity merely to observe progress.
+
 ## 1. Orient and classify
 
 Read the relevant repository guidance and current request. Preserve existing
@@ -55,16 +68,18 @@ Flash under a vague "build it" prompt.
 Default artifact home: `docs/agent-work/<feature>/`. Follow an existing project
 convention instead when one is established. Use the templates as needed.
 
-Write a dependency-ordered phase plan. Each Flash assignment is one coherent,
-reviewable bundle with exact contracts, a bounded file scope, testable outcomes,
-and verification commands. Internal implementation/test steps stay with Flash;
-Astra does not write the entire implementation in the plan. Long work is welcome
-inside a clear contract, not across unknown architecture boundaries.
+Write a dependency-ordered phase plan. Prefer one coherent end-to-end vertical
+bundle per phase when its contract is stable. Each Flash assignment has exact
+contracts, a bounded file scope, testable outcomes, and verification commands.
+Internal discovery, implementation, testing, debugging, and routine UI validation
+stay with Flash; Astra does not write the entire implementation in the plan. Long
+work is welcome inside a clear contract, not across unknown architecture boundaries.
 
-Separate tasks at independent review boundaries, not at every function or
-five-minute step. A phase can contain multiple bundles; a bundle can contain
-multiple test/code/fix cycles. Complete early phases first and refine later briefs
-when earlier interfaces stabilize. If a machine-readable plan is useful, use
+Separate tasks only at genuine dependency or independent acceptance boundaries,
+not for status visibility, every function, or every five-minute step. A phase can
+contain multiple bundles when required; a bundle can contain multiple test/code/fix
+cycles. Complete early phases first and refine later briefs when earlier interfaces
+stabilize. If a machine-readable plan is useful, use
 `templates/plan.json` and run
 `scripts/validate_plan.py <plan.json> --repo-root <repository-root>` before launch.
 That linter checks structure, not the truth or quality of the design.
@@ -88,11 +103,14 @@ its claimed paths. Use two writers only when the plan explicitly identifies
 independent work and each has a real, verified separate workspace. See execution
 reference for dirty-tree, contract, and integration rules. No recursive agents.
 
-Let the worker complete its internal implementation and testing loop. Use the
-native wait/continuation facilities, not rapid polling or arbitrary early kills.
-Set a task-appropriate budget and checkpoint rule rather than assuming every
-job fits a fixed time estimate. Resume the same worker for review fixes; start a
-fresh context for an unrelated bundle.
+Let the worker complete its internal implementation, testing, debugging, and
+routine UI-validation loop. Use the longest practical native wait and allow it to
+finish. Do not poll with status/list calls, request progress updates, interrupt a
+healthy run, or perform overlapping repository work while the worker owns the
+bundle. A wait timeout alone is not evidence that the worker is stuck. Set a
+task-appropriate budget and checkpoint rule rather than assuming every job fits a
+fixed time estimate. Resume the same worker for one consolidated review-fix cycle;
+start a fresh context only for an unrelated bundle.
 
 ## 6. Review the actual result
 
@@ -101,17 +119,19 @@ accepted. Astra reviews the actual patch against the captured baseline, includin
 untracked additions and pre-existing changes. Never treat HEAD as the baseline
 without checking the workspace state.
 
-Run two explicit passes: specification compliance, then code quality/security.
-They can be separate passes by the root Astra; there is no requirement to buy two
-additional reviewer agents. Run independent relevant checks, inspect UI behavior
-visually when applicable, and distinguish genuine failures from environment
-limitations. Default reviewer subagents would also route to Flash, so do not
-mistake a default child for an independent Astra review.
+Apply two review lenses in one batched Astra pass: specification compliance, then
+code quality/security. Inspect the actual diff and the worker's evidence. Perform
+targeted spot checks where evidence is missing, a failure is plausible, or the risk
+justifies independent confirmation. Do not routinely rerun the worker's complete
+test suite or repeat visual QA that has adequate artifacts. Default reviewer
+subagents would also route to Flash, so do not mistake a default child for an
+independent Astra review.
 
-Accept only after both passes and relevant verification succeed. Return precise
-file-level feedback to the same worker when needed. After two rejected correction
-cycles, diagnose with Astra and re-scope, split, or take over the difficult portion;
-do not blindly keep retrying. Never silently switch model/provider.
+Accept only after both lenses and relevant verification succeed. If corrections
+are needed, return all precise file-level findings to the same worker in one request.
+Default to at most one correction cycle, then accept or explicitly reassess the
+scope and risk. A second cycle is reserved for a material unresolved issue in the
+high-assurance exception below. Never silently switch model/provider.
 
 ## 7. Integrate, checkpoint, and finish
 
@@ -121,11 +141,21 @@ migrations just because a phase finished. Shared-workspace edits already exist i
 the workspace; don't invent a branch merge. Separate-worktree integration needs
 an explicit, reviewed operation and a valid common baseline.
 
-Rerun cross-task checks after integration. Update the plan and a compact
-`CHECKPOINT.md`: completed/accepted work, current diff/workspace, contract
-decisions, pending tasks, worker thread IDs, review status, exact resume action.
-Preserve evidence before context compaction. Do not repeatedly reload full logs.
+Run cross-task checks once at a genuine integration boundary, and only when those
+checks add coverage beyond the worker's accepted evidence. Update the plan and a
+compact `CHECKPOINT.md` at meaningful resumable boundaries, not after every turn:
+completed/accepted work, current diff/workspace, contract decisions, pending tasks,
+worker thread IDs, review status, exact resume action. Preserve evidence before
+context compaction. Do not repeatedly reload full logs.
 
 Conclude with what was built, what actually passed, outstanding limits, and the
 verified or unverified routing state. Never estimate cost savings from task counts
 or durations. Use actual provider usage records when measuring costs.
+
+## High-assurance exception
+
+Expand Astra's investigation, checks, or correction cycle only when evidence shows
+material risk involving architecture, authentication/authorization, payments,
+tenancy, secrets, destructive migrations, production behavior, or high-impact
+shared infrastructure. State the reason for expanding the root loop. High assurance
+does not justify progress polling, duplicate implementation, or ritual reruns.

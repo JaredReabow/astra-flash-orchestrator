@@ -2,10 +2,12 @@
 
 ## Default: one native writer, no extra harness
 
-The default is one native Flash child in the current workspace. Astra supplies
-the contract, lets the child execute, and reviews its work. This avoids a second
-CLI process, environment-variable command string, automatic commits, and accidental
-provider bypass. No `FLASH_WORKER_CMD` or external run_worker.sh is needed.
+The default is one native Flash child in the current workspace for one coherent
+end-to-end phase bundle. Astra supplies the contract, dispatches once, waits, and
+reviews one completion report. The worker owns in-scope repository discovery,
+implementation, tests, debugging, and routine browser/visual QA. This avoids a
+second CLI process, environment-variable command string, automatic commits, and
+accidental provider bypass. No `FLASH_WORKER_CMD` or external run_worker.sh is needed.
 
 Before editing, capture the workspace root, current branch/HEAD when Git exists,
 tracked/staged diff and untracked-file inventory. Preserve relevant pre-existing
@@ -51,15 +53,19 @@ safe. Do not delete a dirty worktree or unmerged result automatically.
 Give the task's complete brief and just the relevant shared context. Do not tell
 a fresh worker "continue what we discussed" without supplying the decisions.
 For a long run, let the child perform internal milestones and test/fix loops.
-Capture progress at meaningful boundaries, not every tool call. Where a host
-turn limit interrupts it, resume the same task with its checkpoint; do not
+Require one concise completion report and keep verbose logs in the workspace.
+Capture progress at meaningful resumable boundaries, not every tool call. Where a
+host turn limit interrupts it, resume the same task with its checkpoint; do not
 promise that any model or harness can run indefinitely.
 
-Use native wait/message/continuation functions as actually exposed. When a
-worker is blocked, Astra resolves the contract or environment question and sends
-a targeted update. For rejected work, send concrete findings to the same child.
-After two unsuccessful review correction cycles, diagnose and re-scope rather
-than paying for an uncontrolled loop. Recheck accepted dependencies after fixes.
+Use native wait/message/continuation functions as actually exposed. Choose the
+longest practical wait. Do not use repeated list/status calls as heartbeats, request
+play-by-play updates, interrupt a healthy run, or duplicate its repository work.
+A wait timeout alone is not a blocker. When a worker is genuinely blocked, Astra
+resolves the contract or environment question and sends one targeted update. For
+rejected work, batch all concrete findings and send one correction request to the
+same child. Default to one correction cycle. Recheck only the affected behavior and
+accepted dependencies; broaden further only for a material high-assurance risk.
 
 ## Git and production boundaries
 

@@ -9,6 +9,14 @@ Use one Flash writer by default; do not create an agent for each tiny coding ste
 Prefer this native workflow over an older `flash-build` external-runner skill for
 the same task; do not load both execution paths.
 
+Use thin-root orchestration by default. After establishing the contract, give one
+Flash worker a coherent end-to-end phase bundle and let it own repository discovery,
+implementation, testing, debugging, and routine browser/visual QA inside that
+scope. Astra should normally perform one planning batch, one dispatch, one wait,
+one batched acceptance review, and one final response. Do not poll for progress,
+request status updates, interrupt a healthy run, duplicate the worker's repository
+work, or rerun its full validation without a concrete reason.
+
 This is a scoped exception to generic personal defaults such as "one agent" or
 "no workers" in this instruction file. Keep those defaults for trivial changes,
 unrelated work, and tasks explicitly requested without delegation. It does not
@@ -18,9 +26,16 @@ workflow or delegate further.
 
 Reuse an existing approved spec/plan, including Superpowers or GSD artifacts.
 Otherwise establish scope and contracts, plan dependency-ordered phases, then
-execute and review each task bundle. Do not repeat approval questions already
-resolved by the user's instruction. Material scope changes still need resolution.
-Keep final review and sensitive architecture decisions with Astra.
+execute and review each task bundle. Review specification compliance and quality/
+security as two lenses in one batched pass. Send all findings in one correction
+request and default to at most one correction cycle. Do not repeat approval
+questions already resolved by the user's instruction. Material scope changes still
+need resolution. Keep final review and sensitive architecture decisions with Astra.
+
+Additional Astra investigation or verification is justified for a concrete
+architecture, security, authorization, payments, tenancy, secrets, destructive
+migration, production, or shared-infrastructure risk. High assurance is an
+exception triggered by evidence, not the routine operating mode.
 
 Do not switch the root to Flash, silently fall back to a different worker model,
 launch another agent CLI, loosen permissions, expose secrets, auto-commit,

@@ -1,6 +1,6 @@
 # Validation evidence
 
-Public source version: 1.0.2. Checked September 17, 2026 on macOS with Python 3.14.3.
+Public source version: 1.1.0. Checked September 19, 2026 on macOS with Python 3.14.3.
 
 ## Verified
 

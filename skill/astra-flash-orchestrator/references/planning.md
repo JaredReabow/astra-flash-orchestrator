@@ -30,7 +30,10 @@ remain distinct decisions. Follow the current user and repository permissions.
 ## Phases and task bundles
 
 A phase is an integration milestone. A task bundle is the work a single worker
-can finish and Astra can independently accept or reject. For example:
+can finish and Astra can independently accept or reject. Prefer one vertical,
+end-to-end bundle per phase when the contract is stable. Split only for a genuine
+dependency, ownership, risk, workspace, or independent acceptance boundary—not to
+manufacture progress checkpoints. For example:
 
 - Foundation: establish shared types and fixtures, including contract tests.
 - Implementation: build a complete bounded behavior against those contracts.
@@ -57,5 +60,7 @@ every token; reserve implementation discretion for Flash inside the contract.
 
 A long worker run should mean sustained execution of a clear assignment, not an
 unbounded self-directed project. Require a checkpoint when interrupted or blocked,
-and let the host's continuation facilities carry the same assignment forward.
-Long context capacity is not a reason to send every file or every past message.
+and otherwise expect one completion report after the worker's internal test/fix and
+routine UI-validation loop. Let the host's continuation facilities carry the same
+assignment forward. Long context capacity is not a reason to send every file or
+every past message.

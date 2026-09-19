@@ -19,6 +19,10 @@ Astra  →  review + verify + accept or request fixes
 
 - **Native delegation:** uses the `astra_flash_builder` role, not a separate agent CLI.
 - **Coherent assignments:** one feature slice can include many edit/test/fix steps.
+- **Thin Astra root:** normally one planning batch, one dispatch, one wait, one
+  batched acceptance review and one final response.
+- **Worker-owned execution:** Flash handles in-scope discovery, implementation,
+  testing, debugging and routine browser/visual QA without progress polling.
 - **Review before acceptance:** the builder submits evidence; Astra decides whether it is complete.
 - **Existing plans welcome:** works with repository plans, Superpowers/GSD artifacts, or the included templates.
 - **Controlled parallel work:** one writer by default; two only with independent tasks and verified separate workspaces.
@@ -99,8 +103,9 @@ Root model/effort, provider configuration, authentication and existing permissio
 
 ```text
 $astra-flash-orchestrator Use the existing plan in docs/plan.md to implement
-this feature. Keep Astra as orchestrator and reviewer. Use the installed
-Flash builder for implementation, verify each task, and maintain a checkpoint.
+this feature. Keep Astra as the thin orchestrator and reviewer. Use one installed
+Flash builder for a coherent implementation and verification bundle. Do not poll
+the worker; review its completed patch and evidence in one batched pass.
 ```
 
 Replace the example plan path with your actual plan or describe the feature. Your first authorized useful task should verify the child model and provider using host/router request metadata. A worker saying its model name is not proof.

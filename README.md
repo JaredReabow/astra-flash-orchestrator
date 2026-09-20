@@ -2,7 +2,7 @@
 
 **Save Astra for the decisions that need it. Let DeepSeek V4.1 Flash do the volume.**
 
-![Astra Flash Orchestrator measured efficiency](docs/assets/astra-savings.svg)
+![Astra Flash Orchestrator measured efficiency](docs/assets/astra-savings-v2.svg)
 
 A personal Codex skill designed to preserve Astra usage without giving up Astra's
 judgment. Astra stays responsible for planning, architecture, high-stakes

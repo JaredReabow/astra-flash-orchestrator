@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Detect keys absorbed into `[agents]` by shape instead of by a list of
+  anticipated top-level names. A stray key there is read by Codex as an agent
+  name and stops the whole config loading, and the previous check only covered
+  five names, missing the realtime base-URL keys that caused a real failure.
+- Accept a legitimate `[agents]` table containing the recognized scalar settings
+  and agent role tables, and reject an agent name whose value is not a table.
+- Tell installation agents to select an existing Python 3.11+ interpreter rather
+  than assume `python3`, and never to edit `config.toml` to make a check pass.
+
 ## 1.2.0 — Measured workflow and simpler installation
 
 - Add a measured efficiency graphic, per-token price comparison and transparent

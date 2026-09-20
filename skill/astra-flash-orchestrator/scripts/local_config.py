@@ -18,6 +18,22 @@ ROUTE = "deepseek/deepseek-v4.1-flash"
 ROLE = "astra_flash_builder"
 SKILL = "astra-flash-orchestrator"
 
+# Keys Codex reads as scalar settings directly under [agents]. Every other key
+# there is read as an agent NAME whose value must be a role table, so a scalar
+# under an unrecognized name makes Codex reject the entire config with
+# "invalid type: ..., expected struct AgentRoleToml in `agents`" -- which takes
+# down the host app and the CLI together, not just subagent routing.
+AGENT_SCALAR_SETTINGS = frozenset({
+    "enabled",
+    "default_subagent_model",
+    "default_subagent_reasoning_effort",
+    "interrupt_message",
+    "max_concurrent_threads_per_session",
+    "max_threads",
+    "max_depth",
+    "job_max_runtime_seconds",
+})
+
 
 class SetupError(ValueError):
     """An actionable configuration problem, without credential-bearing details."""
@@ -93,14 +109,22 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
     agents = config.get("agents", {})
     if not isinstance(agents, dict):
         raise SetupError("The existing [agents] setting is not a TOML table.")
-    misplaced = sorted(set(agents) & {
-        "model", "model_provider", "model_reasoning_effort", "model_catalog_json", "openai_base_url"
-    })
+    # Checking shape rather than a list of known top-level names catches any
+    # absorbed key, not just the handful an installer happens to anticipate.
+    misplaced = sorted(
+        key for key, value in agents.items()
+        if key not in AGENT_SCALAR_SETTINGS and not isinstance(value, dict)
+    )
     if misplaced:
         raise SetupError(
-            "Possible top-level setting(s) were placed inside [agents]: "
+            "Setting(s) that do not belong under [agents] were found there: "
             + ", ".join(misplaced)
-            + ". In TOML, a table header remains active until the next table header. Repair config.toml before installing."
+            + ". In TOML, a table header remains active until the next table header, so a "
+            "top-level key written after [agents] is absorbed into it; Codex then reads that "
+            "key as an agent name and refuses to load the whole config. Move those keys above "
+            "the first table header, or under the agent role they belong to, before installing. "
+            "If your Codex build documents one of them as a genuine [agents] setting, it is newer "
+            "than this check; verify with `codex doctor` rather than editing around this error."
         )
     if agents.get("enabled") is False:
         raise SetupError("Subagents are disabled in the inspected config. This installer will not enable them silently.")

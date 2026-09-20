@@ -18,9 +18,15 @@ worker model and catalog-supported effort.
 
 Verify Python 3.11+, native subagent/custom-role client support, and the existing
 worker route deepseek/deepseek-v4.1-flash in the effective configuration/catalog.
+The default python3 may be older than 3.11; find an existing 3.11+ interpreter
+such as python3.12 and use it for every command here. Do not install or upgrade a
+runtime to satisfy this.
 The package supports loopback /v1 and /_codex-router/<capability>/v1 endpoints.
 If configuration is contradictory or unsupported, report the discrepancy.
 Do not silently change models/providers or bypass preflight.
+Never edit config.toml to make a preflight check pass. Report the discrepancy and
+stop. Appending a table header such as [agents] to config.toml absorbs every
+top-level key written after it and can stop Codex loading its config at all.
 
 Run the offline tests, then install.py for a dry run. If they pass and the
 proposed files match the documented scope, apply with install.py --apply.

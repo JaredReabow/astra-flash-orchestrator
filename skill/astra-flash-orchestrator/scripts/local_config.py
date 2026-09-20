@@ -15,6 +15,14 @@ if sys.version_info < (3, 11):
 import tomllib
 
 ROUTE = "deepseek/deepseek-v4.1-flash"
+SUPPORTED_ROUTES = {
+    ROUTE: "DeepSeek API",
+    "openrouter/deepseek-v4.1-flash": "OpenRouter",
+    "opencode-go/deepseek-v4.1-flash": "opencode Go",
+    "commandcode/deepseek-v4.1-flash": "Command Code",
+    "nousresearch/deepseek-v4.1-flash": "Nous Research",
+    "ollama-cloud/deepseek-v4.1-flash": "Ollama Cloud",
+}
 ROLE = "astra_flash_builder"
 SKILL = "astra-flash-orchestrator"
 
@@ -83,8 +91,42 @@ def model_id(entry: dict) -> str | None:
     return entry.get("slug") or entry.get("id")
 
 
-def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[dict, str]:
+def resolve_worker_route(requested: str | None = None, binding: Path | None = None) -> str:
+    """Validate an explicit route or reuse this package's existing routing binding."""
+    if requested is not None:
+        route = requested
+    elif binding is None:
+        route = ROUTE
+    else:
+        if any(item.is_symlink() for item in (binding, *binding.parents)):
+            raise SetupError("Refusing to read a worker route through a symlinked routing binding.")
+        if not binding.exists():
+            return ROUTE
+        try:
+            if binding.stat().st_size > 64_000:
+                raise SetupError("The existing routing binding is unexpectedly large; inspect it locally.")
+            payload = json.loads(binding.read_text(encoding="utf-8"))
+            route = payload.get("worker_model") if isinstance(payload, dict) else None
+        except (OSError, json.JSONDecodeError, UnicodeError) as exc:
+            raise SetupError(f"Cannot read the existing routing binding ({type(exc).__name__}).") from None
+        if not isinstance(route, str):
+            raise SetupError("The existing routing binding does not name a worker model.")
+    if route not in SUPPORTED_ROUTES:
+        raise SetupError(
+            "Unsupported worker route. Choose a reviewed DeepSeek V4.1 Flash route: "
+            + ", ".join(SUPPORTED_ROUTES)
+        )
+    return route
+
+
+def inspect(
+    home: Path,
+    codex_home: Path,
+    profile: str | None = None,
+    worker_route: str = ROUTE,
+) -> tuple[dict, str]:
     """Return a redacted static report and a PRIVATE local URL. Do not print URL."""
+    worker_route = resolve_worker_route(worker_route)
     config_path = codex_home / "config.toml"
     config = read_toml(config_path)
     input_hashes = {str(config_path): hashlib.sha256(config_path.read_bytes()).hexdigest()}
@@ -132,7 +174,7 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         warnings.append(
             "The global default_subagent_model is not used or changed; the installed named role pins its own worker model."
         )
-    if config.get("model") == ROUTE:
+    if config.get("model") in SUPPORTED_ROUTES:
         raise SetupError("The root model is Flash. Select Astra as root before installing this workflow.")
 
     catalog_value = config.get("model_catalog_json")
@@ -145,17 +187,23 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         payload = json.loads(catalog_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeError) as exc:
         raise SetupError(f"Cannot read the configured model catalog ({type(exc).__name__}).") from None
-    matches = [entry for entry in model_entries(payload) if model_id(entry) == ROUTE]
+    matches = [entry for entry in model_entries(payload) if model_id(entry) == worker_route]
     if len(matches) != 1:
-        raise SetupError("Flash V4.1 is missing or duplicated in the local catalog. Use the router's own repair process.")
+        raise SetupError(
+            f"The selected Flash V4.1 route ({worker_route}) is missing or duplicated in the local catalog. "
+            "Configure that exact route with the Router's own local setup, then rerun this installer. "
+            "No provider was substituted."
+        )
     entry = matches[0]
     if entry.get("multi_agent_version") != "v2":
         raise SetupError(
-            "Flash exists in the catalog but is not advertised for native subagents "
+            f"The selected Flash route ({worker_route}) exists in the catalog but is not "
+            "advertised for native subagents "
             "(multi_agent_version must be v2). Select this exact route using your "
             "Router's documented subagent settings, republish the catalog, and fully "
             "quit/reopen the host app. Selection is not runtime verification. "
-            "Some Router enable commands launch paid probes; review them before use."
+            "Do not run subagents certify, test-model --live, a smoke test, or another "
+            "paid probe as part of this package's installation."
         )
     levels = entry.get("supported_reasoning_levels", [])
     supported = [x.get("effort") if isinstance(x, dict) else x for x in levels] if isinstance(levels, list) else []
@@ -200,7 +248,8 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         "inference_request_made": False,
         "root_model_observed": config.get("model"),
         "root_effort_observed": config.get("model_reasoning_effort"),
-        "worker_model": ROUTE,
+        "worker_model": worker_route,
+        "worker_provider": SUPPORTED_ROUTES[worker_route],
         "worker_effort": effort,
         "custom_agent": ROLE,
         "profile_inspected": selected,

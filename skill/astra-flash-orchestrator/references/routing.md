@@ -3,23 +3,30 @@
 The installed setup has three separate jobs:
 
 1. Codex selects the root and child models.
-2. Codex Router forwards the selected child route to DeepSeek.
+2. Codex Router forwards the selected child route to its pinned provider.
 3. This skill tells Astra when to plan, delegate, review, and integrate.
 
-As documented on September 17, 2026, the vendor API's `deepseek-flash` name
-corresponds to V4.1 Flash. Codex Router exposes its direct-provider route as
-`deepseek/deepseek-v4.1-flash`. Do not substitute the vendor name in the router's
-model field. See `sources.md` for the public references.
+As documented on September 20, 2026, the vendor API's `deepseek-flash` name
+corresponds to V4.1 Flash. Codex Router exposes reviewed routes through DeepSeek,
+OpenRouter, opencode Go, Command Code, Nous Research and Ollama Cloud. The
+installed `routing.json` records the exact selected route and provider. Do not
+substitute an upstream vendor name in the role's model field. See `sources.md`
+for the public references.
 
 ## Installation bindings
 
-The installer verifies that route exists in the configured local model catalog.
-It writes a standalone personal agent with the name `astra_flash_builder` and
-pins both its model and the catalog's supported default effort. It does not
+The installer uses direct DeepSeek by default or the reviewed route explicitly
+passed with `--worker-route`, then verifies that exact entry exists in the local
+model catalog with `multi_agent_version: "v2"`. It never auto-selects a provider.
+On later updates and doctor runs, a valid installed `routing.json` preserves that
+choice when the option is omitted. It writes a standalone personal agent with the
+name `astra_flash_builder` and pins both its route and the catalog's supported
+default effort. It does not
 require, inherit or change global `[agents].default_subagent_model` or
 `[agents].default_subagent_reasoning_effort` values, so unrelated subagents keep
 their existing defaults. It leaves root settings, provider URLs, credentials,
-and config.toml untouched.
+and config.toml untouched. Provider keys are entered by the user through the
+Router's private local prompt, never through assistant chat.
 The child inherits sandbox/approval settings; its `[agents].enabled = false`
 prevents recursive subagent tools under the documented custom-agent format.
 
@@ -45,21 +52,22 @@ For the first real delegated task, verify all of the following:
 
 - Root thread still shows Astra; child thread/session metadata shows the exact
   Flash route or an equivalent documented provider mapping.
-- Router request/usage metadata confirms the DeepSeek provider and upstream model
+- Router request/usage metadata confirms the selected provider and upstream model
   for that child request. Do not paste private caller URLs, tokens, or raw logs.
 - The child actually executes a small useful task, changes only its scope, and
   returns test evidence; Astra reviews the result independently.
 
 When metadata is unavailable, report that inference routing remains unverified.
 A response saying "I am DeepSeek" is not evidence. A green router health check
-alone is not an end-to-end test. Do not run an extra paid inference request during
-installation; the user's first approved build can establish this evidence.
+alone is not an end-to-end test. Do not run `subagents certify`, `test-model
+--live`, a smoke test or another paid probe during package installation; the
+user's first approved useful build can establish runtime evidence.
 
 ## Usage and privacy
 
-Delegation sends the selected task context and tool results to the configured
-DeepSeek provider. Preserve provider-sharing restrictions on private repositories;
-use minimal necessary context and avoid production data and secrets. A worktree
+Delegation sends the selected task context and tool results to the provider pinned
+by the installed worker route. Preserve provider-sharing restrictions on private
+repositories; use minimal necessary context and avoid production data and secrets. A worktree
 is not an operating-system sandbox. Do not disable approval or sandbox mechanisms
 and do not inherit a bypass-permissions CLI from the old package.
 

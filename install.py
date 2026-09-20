@@ -18,7 +18,7 @@ sys.dont_write_bytecode = True
 BUNDLE = Path(__file__).resolve().parent
 SKILL_SOURCE = BUNDLE / "skill" / "astra-flash-orchestrator"
 sys.path.insert(0, str(SKILL_SOURCE / "scripts"))
-from local_config import SetupError, default_locations, inspect, ROLE, SKILL
+from local_config import SetupError, default_locations, inspect, resolve_worker_route, ROLE, SKILL, SUPPORTED_ROUTES
 
 BEGIN = b"<!-- BEGIN astra-flash-orchestrator managed policy -->"
 END = b"<!-- END astra-flash-orchestrator managed policy -->"
@@ -91,7 +91,10 @@ def plan_changes(home: Path, codex_home: Path, report: dict, with_policy: bool, 
                 and source.suffix not in {".pyc", ".pyo", ".bak"}
                 and ".before-" not in source.name and source.name != ".DS_Store"):
             requested[target / source.relative_to(SKILL_SOURCE)] = source.read_bytes()
-    routing = {key: report[key] for key in ("worker_model", "worker_effort", "custom_agent", "profile_inspected")}
+    routing = {
+        key: report[key]
+        for key in ("worker_model", "worker_provider", "worker_effort", "custom_agent", "profile_inspected")
+    }
     requested[target / "routing.json"] = (json.dumps(routing, indent=2) + "\n").encode()
     instructions = (BUNDLE / "WORKER-INSTRUCTIONS.md").read_text(encoding="utf-8").strip()
     # JSON basic strings are valid TOML basic strings for these generated values.
@@ -222,6 +225,11 @@ def main() -> int:
     parser.add_argument("--home", help="override HOME (primarily for isolated tests)")
     parser.add_argument("--codex-home", help="override CODEX_HOME")
     parser.add_argument("--profile", help="inspect a specific existing profile; does not change profile selection")
+    parser.add_argument(
+        "--worker-route",
+        choices=SUPPORTED_ROUTES,
+        help="pin one reviewed DeepSeek V4.1 Flash provider route (default: existing binding, then direct DeepSeek API)",
+    )
     parser.add_argument("--undo", type=Path, metavar="RECEIPT", help="preview restoration from an installation receipt; combine with --apply to restore")
     args = parser.parse_args()
     try:
@@ -229,7 +237,9 @@ def main() -> int:
         if args.undo:
             undo(args.undo, home, codex_home, args.apply)
             return 0
-        report, _private_url = inspect(home, codex_home, args.profile)
+        binding = home / ".agents" / "skills" / SKILL / "routing.json"
+        worker_route = resolve_worker_route(args.worker_route, binding)
+        report, _private_url = inspect(home, codex_home, args.profile, worker_route)
         changes = plan_changes(home, codex_home, report, not args.no_policy, args.replace)
         print(json.dumps(report, indent=2))
         for change in changes:

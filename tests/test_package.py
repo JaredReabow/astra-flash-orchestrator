@@ -15,7 +15,10 @@ SCRIPTS = ROOT / 'skill' / 'astra-flash-orchestrator' / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT))
 import install
-from local_config import ROUTE, ROLE, SKILL, SetupError, inspect, model_entries
+from local_config import (
+    ROUTE, ROLE, SKILL, SUPPORTED_ROUTES, SetupError, inspect, model_entries,
+    resolve_worker_route,
+)
 from validate_plan import PlanError, validate
 
 
@@ -53,6 +56,12 @@ class SetupFixture(unittest.TestCase):
     def report(self):
         return inspect(self.home, self.codex)[0]
 
+    def set_catalog_route(self, route, multi_agent_version='v2'):
+        payload = json.loads(self.catalog.read_text())
+        payload['models'][0]['slug'] = route
+        payload['models'][0]['multi_agent_version'] = multi_agent_version
+        self.catalog.write_text(json.dumps(payload))
+
     def changes(self, **kwargs):
         return install.plan_changes(self.home, self.codex, self.report(), kwargs.get('policy', True), kwargs.get('replace', False))
 
@@ -83,6 +92,50 @@ class SetupFixture(unittest.TestCase):
         self.assertNotIn('sandbox_mode', role)
         self.assertNotIn('model_provider', role)
         self.assertIn('No model request was made', result.stdout)
+
+    def test_supported_worker_routes_are_selected_explicitly(self):
+        for route, provider in SUPPORTED_ROUTES.items():
+            with self.subTest(route=route):
+                self.set_catalog_route(route)
+                report, _ = inspect(self.home, self.codex, worker_route=route)
+                self.assertEqual(report['worker_model'], route)
+                self.assertEqual(report['worker_provider'], provider)
+
+    def test_openrouter_route_is_pinned_in_role_and_routing_binding(self):
+        route = 'openrouter/deepseek-v4.1-flash'
+        self.set_catalog_route(route)
+        result = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], route)
+        routing = json.loads(
+            (self.home / '.agents' / 'skills' / SKILL / 'routing.json').read_text()
+        )
+        self.assertEqual(routing['worker_model'], route)
+        self.assertEqual(routing['worker_provider'], 'OpenRouter')
+
+    def test_existing_alternate_binding_is_reused_on_update(self):
+        route = 'openrouter/deepseek-v4.1-flash'
+        self.set_catalog_route(route)
+        first = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(first.returncode, 0, first.stderr)
+        second = self.cli('--apply')
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertIn('no changes needed', second.stdout)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], route)
+
+    def test_default_route_does_not_fall_back_to_available_alternate(self):
+        self.set_catalog_route('openrouter/deepseek-v4.1-flash')
+        result = self.cli()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(ROUTE, result.stderr)
+        self.assertIn('No provider was substituted', result.stderr)
+        self.assertFalse((self.home / '.agents').exists())
+
+    def test_unreviewed_worker_route_is_rejected(self):
+        with self.assertRaisesRegex(SetupError, 'Unsupported worker route'):
+            inspect(self.home, self.codex, worker_route='custom/deepseek-v4.1-flash')
 
     def test_planned_writes_never_include_config(self):
         self.assertNotIn(self.config, {change['path'] for change in self.changes()})
@@ -150,6 +203,22 @@ class SetupFixture(unittest.TestCase):
                 self.assertIn('not advertised for native subagents', result.stderr)
                 self.assertFalse((self.home / '.agents').exists())
                 self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_non_spawnable_alternate_route_blocks_install_without_paid_probe_advice(self):
+        route = 'openrouter/deepseek-v4.1-flash'
+        self.set_catalog_route(route, 'v1')
+        result = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(route, result.stderr)
+        self.assertIn('Do not run subagents certify', result.stderr)
+        self.assertFalse((self.home / '.agents').exists())
+
+    def test_flash_root_is_rejected_for_every_supported_provider(self):
+        route = 'openrouter/deepseek-v4.1-flash'
+        self.set_catalog_route(route)
+        self.config.write_text(self.config.read_text().replace('fixture-astra-root', route))
+        with self.assertRaisesRegex(SetupError, 'root model is Flash'):
+            inspect(self.home, self.codex, worker_route=route)
 
     def test_non_loopback_route_fails_without_exposing_url(self):
         self.config.write_text(self.config.read_text().replace('127.0.0.1', 'private.remote.test'))
@@ -354,7 +423,7 @@ class SetupFixture(unittest.TestCase):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 seen.append(self.path)
-                body = json.dumps({'data': [{'id': ROUTE}]}).encode()
+                body = json.dumps({'data': [{'id': 'openrouter/deepseek-v4.1-flash'}]}).encode()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
@@ -365,13 +434,18 @@ class SetupFixture(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
+            route = 'openrouter/deepseek-v4.1-flash'
+            self.set_catalog_route(route)
             self.config.write_text(self.config.read_text().replace(':4202/', f':{server.server_port}/'))
             result = subprocess.run([sys.executable, str(SCRIPTS / 'doctor.py'), '--home', str(self.home),
-                                     '--codex-home', str(self.codex), '--check-local-router'], capture_output=True, text=True)
+                                     '--codex-home', str(self.codex), '--worker-route', route,
+                                     '--check-local-router'], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(seen, ['/_codex-router/TEST_PRIVATE_CAPABILITY/v1/models'])
             self.assertNotIn('TEST_PRIVATE_CAPABILITY', result.stdout + result.stderr)
-            self.assertFalse(json.loads(result.stdout)['runtime_verified'])
+            report = json.loads(result.stdout)
+            self.assertEqual(report['worker_model'], route)
+            self.assertFalse(report['runtime_verified'])
         finally:
             server.shutdown()
             server.server_close()
@@ -386,6 +460,35 @@ class SetupFixture(unittest.TestCase):
 
 
 class PolicyTests(unittest.TestCase):
+    def test_worker_route_resolution_defaults_and_reuses_valid_binding(self):
+        self.assertEqual(resolve_worker_route(), ROUTE)
+        with tempfile.TemporaryDirectory() as directory:
+            binding = Path(directory).resolve() / 'routing.json'
+            route = 'openrouter/deepseek-v4.1-flash'
+            binding.write_text(json.dumps({'worker_model': route}))
+            self.assertEqual(resolve_worker_route(binding=binding), route)
+            self.assertEqual(resolve_worker_route(ROUTE, binding), ROUTE)
+
+    def test_worker_route_resolution_rejects_malformed_or_unreviewed_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binding = Path(directory).resolve() / 'routing.json'
+            binding.write_text('{broken')
+            with self.assertRaises(SetupError):
+                resolve_worker_route(binding=binding)
+            binding.write_text(json.dumps({'worker_model': 'custom/deepseek-v4.1-flash'}))
+            with self.assertRaisesRegex(SetupError, 'Unsupported worker route'):
+                resolve_worker_route(binding=binding)
+
+    def test_worker_route_resolution_refuses_symlinked_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            target = root / 'target.json'
+            target.write_text(json.dumps({'worker_model': ROUTE}))
+            binding = root / 'routing.json'
+            binding.symlink_to(target)
+            with self.assertRaisesRegex(SetupError, 'symlinked routing binding'):
+                resolve_worker_route(binding=binding)
+
     def test_crlf_and_unrelated_text_are_preserved(self):
         block = install.BEGIN + b'\nnew\n' + install.END + b'\n'
         old = b'prefix\r\n' + install.BEGIN + b'\r\nold\r\n' + install.END + b'\r\nsuffix\r\n'

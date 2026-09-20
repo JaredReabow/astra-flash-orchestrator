@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Support explicit, reviewed DeepSeek V4.1 Flash routes through OpenRouter,
+  opencode Go, Command Code, Nous Research and Ollama Cloud while retaining the
+  direct DeepSeek API as the default. Existing alternate-route installations
+  reuse their validated routing binding on doctor checks and updates.
+- Make provider choice fail closed: no catalog auto-detection, silent fallback,
+  credential handling or paid certification during package installation.
+- State that users enter API keys only through the Router's private local prompt,
+  and prohibit installation agents from running `subagents certify`,
+  `test-model --live`, smoke tests or other paid probes.
 - Detect keys absorbed into `[agents]` by shape instead of by a list of
   anticipated top-level names. A stray key there is read by Codex as an agent
   name and stops the whole config loading, and the previous check only covered

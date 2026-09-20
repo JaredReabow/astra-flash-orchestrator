@@ -1,10 +1,20 @@
 # Validation evidence
 
-Public source version: 1.1.0. Checked September 19, 2026 on macOS with Python 3.14.3.
+Unreleased candidate based on version 1.2.0. Checked September 20, 2026 on macOS
+with Python 3.14.3.
 
 ## Verified
 
-- 46 offline tests passed. Coverage includes installation dry runs, idempotence, original configuration preservation, scoped policy handling, profile/collision/symlink checks, URL validation, fake-secret redaction, generated role TOML, rollback, guarded undo, plan validation and release-file filtering.
+- 63 offline tests passed. Coverage includes installation dry runs, idempotence,
+  original configuration preservation, scoped policy handling,
+  profile/collision/symlink checks, URL validation, fake-secret redaction,
+  generated role TOML, rollback, guarded undo, plan validation and release-file
+  filtering.
+- Every documented V4.1 Flash route is accepted only when explicitly selected or
+  preserved from an existing valid package binding and advertised as
+  `multi_agent_version: "v2"`. Tests cover OpenRouter role generation, remembered
+  update behavior, unreviewed-route rejection, uncertified-route rejection and
+  refusal to fall back from direct DeepSeek to an available alternate provider.
 - Native `/v1` and capability-path Router configurations are accepted; non-loopback hosts and unsupported URL shapes are rejected.
 - Existing backup-directory permissions are preserved.
 - Backup files and caches are excluded from skill installation. Release tests also cover private artifact exclusion, symlink rejection and inventory changes.
@@ -17,6 +27,10 @@ The preceding package revision was installed in a macOS Codex setup using an Ast
 
 ## Still unverified
 
-Actual Astra-to-Flash delegated inference, native role loading in a fresh session, provider request attribution, long-running build quality and cost savings remain unverified for this package. A static report, a model catalog entry, or a worker naming itself cannot establish these facts.
+Actual delegated inference through the newly supported alternate providers,
+native role loading for those routes in a fresh session, provider request
+attribution, long-running build quality and cost savings remain unverified for
+this candidate. A static report, a model catalog entry, or a worker naming itself
+cannot establish these facts.
 
 Validate real routing during the first authorized useful task, using host/router request metadata. Do not run an extra paid test as part of installation, and do not publish raw private logs or local configuration as evidence.

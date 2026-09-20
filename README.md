@@ -2,11 +2,40 @@
 
 **Astra plans and reviews. DeepSeek Flash implements.**
 
+![Astra Flash Orchestrator measured efficiency](docs/assets/astra-savings.svg)
+
 A personal Codex skill that turns an approved plan into substantial implementation tasks, delegates them through your existing Codex Router, and keeps architecture, verification and acceptance with Astra.
 
 Bring an existing plan or start with a feature request. The workflow covers specification, dependency-ordered tasks, implementation, review, corrections and resumable checkpoints.
 
-> **Status:** early release. Offline installation tests pass. Real Astra-to-Flash worker routing and end-to-end build quality have not yet been verified for this package. Installation never runs paid inference.
+> **Status:** early release. Offline installation tests pass, and the workflow has completed a measured local field build. Results below describe that run, not guaranteed savings. A new installation still needs runtime routing verification on its first authorized task. Installation never runs paid inference.
+
+## Measured efficiency
+
+In one substantial field build, the thin workflow used **98.9% less Astra input
+per 1,000 implementation and test lines** than the all-Astra baseline. Total
+API-equivalent compute per 1,000 lines was **97.0–97.7% lower**, while the
+measured phase produced 39% more implementation and test lines.
+
+| Workflow | Astra input per 1K implementation lines | Total compute per 1K lines |
+| --- | ---: | ---: |
+| All Astra | 8.56M | $11.32 |
+| Original orchestration | 3.02M | $3.88–$3.99 |
+| Thin orchestration | **95.9K** | **$0.26–$0.34** |
+
+The per-token price difference explains why delegating implementation has so
+much leverage:
+
+| Cost per 1M tokens | Astra estimator | DeepSeek V4.1 Flash | Astra premium |
+| --- | ---: | ---: | ---: |
+| Uncached input | $10.00 | $0.15–$0.30 | 33–67× |
+| Cached input | $1.00 | $0.003–$0.006 | 167–333× |
+| Output | $50.00 | $0.60–$1.20 | 42–83× |
+
+Astra does not have a public API SKU; its values above are API-equivalent
+estimates, not ChatGPT or Codex subscription charges. Flash values use published
+off-peak and peak API rates. See the [benchmark methodology](docs/BENCHMARK.md)
+for sources, exact measurements and limitations.
 
 ## How it works
 
@@ -30,6 +59,21 @@ Astra  →  review + verify + accept or request fixes
 
 This is workflow guidance, not a deterministic scheduler, a security sandbox, or a guarantee of model quality or cost savings. It is independent of OpenAI, DeepSeek and Codex Router.
 
+### One supported orchestration workflow
+
+There is no mode setting or mode-switch command. **Thin orchestration is the only
+supported delegated workflow.** The word “thin” distinguishes the current design
+from the more Astra-heavy workflow used before version 1.1.0.
+
+Three routing outcomes remain intentionally different:
+
+- Substantial implementation uses the thin Astra → Flash → Astra workflow.
+- Trivial work and explicit single-agent requests stay with the root session.
+- Concrete security, architecture, payments, tenancy, secrets, migration or
+  production risk can justify targeted additional Astra review.
+
+Those are scope and safety decisions, not user-selectable performance modes.
+
 ## Requirements
 
 Before installing, you need:
@@ -38,14 +82,14 @@ Before installing, you need:
 2. GPT-6 Astra selected as the root model.
 3. Python **3.11 or newer**. No third-party Python dependencies are needed.
 4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for the exact route `deepseek/deepseek-v4.1-flash`.
-5. A local Codex model catalog advertising that route with `multi_agent_version: "v2"`, and this existing setting in your effective configuration:
+5. A local Codex model catalog advertising that route with `multi_agent_version: "v2"`.
 
-```toml
-[agents]
-default_subagent_model = "deepseek/deepseek-v4.1-flash"
-```
-
-The setting above is a prerequisite to verify, not a replacement configuration to paste over your own. The installer **does not install the Router, add credentials, select your root model, or rewrite config.toml**. If your routing differs, it stops instead of silently choosing another provider.
+Do **not** add or change `[agents].default_subagent_model` for this package. The
+installer creates a named `astra_flash_builder` role that pins its own model and
+catalog-supported effort, so unrelated subagents keep their existing defaults.
+The installer **does not install the Router, add credentials, select your root
+model, or rewrite `config.toml`**. If the required route is unavailable, it stops
+instead of silently choosing another provider.
 
 The installer supports loopback Router URLs using `/v1` or `/_codex-router/<capability>/v1`. It rejects remote hosts, embedded credentials, queries, fragments and unexpected paths. Client/project/UI overrides still need checking in your actual session. Router subagent selection enables discovery; it does not prove successful inference. Some Router enable commands automatically launch paid verification, so inspect the installed version before changing selection. This installer never enables routes or runs those probes.
 
@@ -60,6 +104,21 @@ cd astra-flash-orchestrator
 
 Run the following commands from that repository folder.
 
+### Fastest safe terminal install
+
+The installer performs its own prerequisite checks before writing. Preview the
+exact destinations, then apply:
+
+```sh
+python3 -B install.py
+python3 -B install.py --apply
+```
+
+That is the normal installation path. The first command changes nothing. The
+second repeats preflight, installs atomically, backs up existing instructions and
+prints a guarded undo receipt. It does not change your root model, Router,
+credentials, permissions or reasoning effort.
+
 ### With Codex
 
 Ask Codex:
@@ -70,17 +129,14 @@ Preserve my root model, reasoning effort, Router, config and authentication.
 Do not launch workers or run paid inference during installation.
 ```
 
-### From a terminal
+### Verify the package locally
 
-Run each command only after the previous one succeeds:
+Release archives are tested before publication. If you also want to run the
+offline suite yourself:
 
 ```sh
 python3 -B -m unittest discover -s tests -v
-python3 -B install.py
-python3 -B install.py --apply
 ```
-
-The second command is a dry run: inspect its report and proposed file destinations. The third installs. Save the printed undo receipt path.
 
 For a nondefault profile, pass `--profile PROFILE` to the dry run, apply and doctor consistently. `--home` and `--codex-home` are available for explicit location overrides. Use the same locations for undo.
 

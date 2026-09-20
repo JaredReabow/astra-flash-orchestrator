@@ -12,7 +12,8 @@ Suggested topics: `codex`, `codex-skills`, `deepseek`, `ai-agents`, `developer-t
 
 1. Confirm the distribution license with the maintainer and include LICENSE.
 2. Run the offline tests and release integrity check. Review the selected release files for secrets, local paths and private instructions.
-3. Review README claims: live worker routing and build quality remain unverified unless new evidence establishes them.
+3. Review README claims against `docs/BENCHMARK.md`. Keep measured results scoped
+   to the documented field run and do not present projections as guaranteed savings.
 4. Create the public repository under the intended GitHub account. Commit and push only with explicit authorization.
 5. Enable private vulnerability reporting in repository settings. No contact address is invented by this package.
 6. Create a versioned release with changelog notes and the generated ZIP. Preserve the ZIP checksum printed by the release script.

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">Astra Flash Orchestrator measured efficiency</title>
+  <desc id="desc">A field benchmark showing 98.9 percent less Astra input per one thousand implementation lines with thin orchestration. All Astra used 8.56 million Astra input tokens per one thousand lines, original orchestration used 3.02 million, and thin orchestration used 95.9 thousand.</desc>
+  <rect width="1200" height="560" fill="#ffffff"/>
+  <rect x="28" y="28" width="1144" height="504" rx="20" fill="#f7f7f4"/>
+
+  <text x="72" y="78" fill="#181817" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20" font-weight="600">Astra Flash Orchestrator</text>
+  <text x="1128" y="78" fill="#6f6f6a" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" text-anchor="end">Measured field benchmark</text>
+  <line x1="72" y1="103" x2="1128" y2="103" stroke="#deded8"/>
+
+  <text x="72" y="151" fill="#087f5b" font-family="SFMono-Regular, Consolas, monospace" font-size="13" font-weight="600" letter-spacing="1.4">ASTRA INPUT PER 1K IMPLEMENTATION LINES</text>
+  <text x="72" y="214" fill="#181817" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="49" font-weight="600" letter-spacing="-2">Keep Astra on the</text>
+  <text x="72" y="268" fill="#181817" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="49" font-weight="600" letter-spacing="-2">decisions that matter.</text>
+  <text x="780" y="239" fill="#087f5b" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="100" font-weight="600" letter-spacing="-6">−98.9%</text>
+  <text x="785" y="272" fill="#6f6f6a" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15">measured Astra input reduction</text>
+
+  <line x1="72" y1="307" x2="1128" y2="307" stroke="#deded8"/>
+
+  <text x="72" y="348" fill="#181817" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15" font-weight="600">All Astra</text>
+  <text x="246" y="348" fill="#6f6f6a" font-family="SFMono-Regular, Consolas, monospace" font-size="14">8.56M</text>
+  <rect x="246" y="361" width="760" height="13" fill="#e7e7e2"/>
+  <rect x="246" y="361" width="760" height="13" fill="#181817"/>
+  <text x="1128" y="372" fill="#181817" font-family="SFMono-Regular, Consolas, monospace" font-size="14" text-anchor="end">$11.32 / 1K lines</text>
+
+  <text x="72" y="415" fill="#181817" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15" font-weight="600">Original orchestration</text>
+  <text x="246" y="415" fill="#6f6f6a" font-family="SFMono-Regular, Consolas, monospace" font-size="14">3.02M</text>
+  <rect x="246" y="428" width="760" height="13" fill="#e7e7e2"/>
+  <rect x="246" y="428" width="269" height="13" fill="#181817"/>
+  <text x="1128" y="439" fill="#181817" font-family="SFMono-Regular, Consolas, monospace" font-size="14" text-anchor="end">$3.88–$3.99 / 1K lines</text>
+
+  <text x="72" y="482" fill="#087f5b" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="15" font-weight="600">Thin orchestration</text>
+  <text x="246" y="482" fill="#087f5b" font-family="SFMono-Regular, Consolas, monospace" font-size="14">95.9K</text>
+  <rect x="246" y="495" width="760" height="13" fill="#e7e7e2"/>
+  <rect x="246" y="495" width="9" height="13" fill="#087f5b"/>
+  <text x="1128" y="506" fill="#087f5b" font-family="SFMono-Regular, Consolas, monospace" font-size="14" font-weight="600" text-anchor="end">$0.26–$0.34 / 1K lines</text>
+</svg>

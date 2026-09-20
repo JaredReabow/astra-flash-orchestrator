@@ -93,12 +93,20 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
     agents = config.get("agents", {})
     if not isinstance(agents, dict):
         raise SetupError("The existing [agents] setting is not a TOML table.")
+    misplaced = sorted(set(agents) & {
+        "model", "model_provider", "model_reasoning_effort", "model_catalog_json", "openai_base_url"
+    })
+    if misplaced:
+        raise SetupError(
+            "Possible top-level setting(s) were placed inside [agents]: "
+            + ", ".join(misplaced)
+            + ". In TOML, a table header remains active until the next table header. Repair config.toml before installing."
+        )
     if agents.get("enabled") is False:
         raise SetupError("Subagents are disabled in the inspected config. This installer will not enable them silently.")
-    if agents.get("default_subagent_model") != ROUTE:
-        raise SetupError(
-            f"Expected the already-installed [agents].default_subagent_model to be {ROUTE!r}. "
-            "It is missing or different. Reconcile the router setup locally; this installer does not rewrite routing."
+    if "default_subagent_model" in agents:
+        warnings.append(
+            "The global default_subagent_model is not used or changed; the installed named role pins its own worker model."
         )
     if config.get("model") == ROUTE:
         raise SetupError("The root model is Flash. Select Astra as root before installing this workflow.")
@@ -127,9 +135,9 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         )
     levels = entry.get("supported_reasoning_levels", [])
     supported = [x.get("effort") if isinstance(x, dict) else x for x in levels] if isinstance(levels, list) else []
-    effort = agents.get("default_subagent_reasoning_effort")
-    if effort is None:
-        effort = entry.get("default_reasoning_level")
+    # The named role owns both worker settings. Do not couple installation to,
+    # inherit, or encourage mutation of global defaults used by unrelated agents.
+    effort = entry.get("default_reasoning_level")
     if effort is not None and (not isinstance(effort, str) or not re.fullmatch(r"[a-z_]+", effort)):
         raise SetupError("The worker reasoning effort is not a recognized string value.")
     if effort is not None and supported and effort not in supported:

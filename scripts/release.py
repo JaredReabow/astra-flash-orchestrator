@@ -10,7 +10,7 @@ ROOT_FILES = {'README.md', 'LICENSE', 'VERSION', 'INSTALL-IN-CODEX.md', 'POLICY.
               'WORKER-INSTRUCTIONS.md', 'SOURCES.md', 'CONTRIBUTING.md',
               'SECURITY.md', 'CHANGELOG.md', '.gitignore', 'install.py'}
 TREES = {'docs', 'skill', 'examples', 'tests', 'scripts'}
-SUFFIXES = {'.md', '.py', '.json', '.yaml'}
+SUFFIXES = {'.md', '.py', '.json', '.yaml', '.svg'}
 
 
 def selected(root=ROOT):

@@ -31,7 +31,6 @@ class SetupFixture(unittest.TestCase):
             'model = "fixture-astra-root"\nmodel_reasoning_effort = "medium"\n'
             'openai_base_url = "http://127.0.0.1:4202/_codex-router/TEST_PRIVATE_CAPABILITY/v1"\n'
             'model_catalog_json = "catalog.json"\n'
-            '[agents]\ndefault_subagent_model = "' + ROUTE + '"\n'
             '[model_providers.unused]\nexperimental_bearer_token = "TEST_SECRET_KEY"\n'
         )
         self.catalog = self.codex / 'catalog.json'
@@ -85,6 +84,9 @@ class SetupFixture(unittest.TestCase):
         self.assertNotIn('model_provider', role)
         self.assertIn('No model request was made', result.stdout)
 
+    def test_planned_writes_never_include_config(self):
+        self.assertNotIn(self.config, {change['path'] for change in self.changes()})
+
     def test_install_excludes_local_backup_and_cache_artifacts(self):
         source = self.home / 'synthetic-skill'
         source.mkdir()
@@ -117,11 +119,20 @@ class SetupFixture(unittest.TestCase):
         self.assertIn(install.BEGIN, override.read_bytes())
         self.assertEqual(self.policy.read_bytes(), self.original_policy)
 
-    def test_missing_worker_default_fails_without_writes(self):
-        self.config.write_text(self.config.read_text().replace(ROUTE, 'fixture-other-model'))
+    def test_install_does_not_require_global_subagent_default(self):
         result = self.cli('--apply')
-        self.assertEqual(result.returncode, 2)
-        self.assertFalse((self.home / '.agents').exists())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_different_global_subagent_default_is_ignored(self):
+        self.config.write_text(self.config.read_text() + '\n[agents]\ndefault_subagent_model = "fixture-other-model"\n')
+        original = self.config.read_bytes()
+        result = self.cli('--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_bytes(), original)
+        self.assertIn('global default_subagent_model is not used or changed', result.stdout)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], ROUTE)
 
     def test_missing_catalog_route_fails(self):
         self.catalog.write_text('{"models": []}')
@@ -180,8 +191,18 @@ class SetupFixture(unittest.TestCase):
         self.assertNotIn('TEST_SECRET_KEY', result.stdout + result.stderr)
 
     def test_disabled_subagents_fail_closed(self):
-        self.config.write_text(self.config.read_text().replace('[agents]', '[agents]\nenabled = false'))
+        self.config.write_text(self.config.read_text() + '\n[agents]\nenabled = false\n')
         with self.assertRaises(SetupError):
+            self.report()
+
+    def test_misplaced_top_level_setting_under_agents_gets_actionable_error(self):
+        self.config.write_text(
+            '# A misplaced table header makes the following URL part of agents.\n'
+            '[agents]\ndefault_subagent_model = "fixture-other-model"\n'
+            'openai_base_url = "http://127.0.0.1:4202/v1"\n'
+            'model_catalog_json = "catalog.json"\n'
+        )
+        with self.assertRaisesRegex(SetupError, r'placed inside \[agents\].*openai_base_url'):
             self.report()
 
     def test_standalone_profile_is_read_without_modifying_it(self):
@@ -198,10 +219,12 @@ class SetupFixture(unittest.TestCase):
         with self.assertRaises(SetupError):
             inspect(self.home, self.codex, 'work')
 
-    def test_unsupported_worker_effort_fails(self):
-        self.config.write_text(self.config.read_text().replace('[agents]', '[agents]\ndefault_subagent_reasoning_effort = "medium"'))
-        with self.assertRaises(SetupError):
-            self.report()
+    def test_global_worker_effort_is_ignored(self):
+        self.config.write_text(self.config.read_text() + '\n[agents]\ndefault_subagent_reasoning_effort = "medium"\n')
+        original = self.config.read_bytes()
+        report = self.report()
+        self.assertEqual(report['worker_effort'], 'high')
+        self.assertEqual(self.config.read_bytes(), original)
 
     def test_existing_foreign_content_requires_explicit_replace(self):
         folder = self.home / '.agents' / 'skills' / SKILL

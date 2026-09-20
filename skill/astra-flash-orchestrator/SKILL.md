@@ -9,7 +9,11 @@ Use the existing Codex Router, not a second agent CLI or API client. This skill
 provides the workflow; the custom agent and router select the worker model. Do
 not claim routing is verified from these instructions or a worker's self-report.
 
-## Thin-root default
+## Supported orchestration workflow
+
+There is no user-selectable mode switch. Thin-root orchestration is the only
+supported delegated workflow. “Thin” distinguishes this design from older,
+more Astra-active revisions; it is not one option in a mode menu.
 
 Keep Astra focused on decisions where its judgment has the highest leverage:
 architecture, acceptance criteria, material risk, and final acceptance. After the
@@ -26,9 +30,9 @@ production-risk concern. Do not create root activity merely to observe progress.
 
 Read the relevant repository guidance and current request. Preserve existing
 work. Decide whether this is a direct small fix, a bounded build, or a large
-multi-phase project. Keep trivial edits with Astra; do not force this process
-onto a typo or a simple question. For a substantial build, say what Astra will
-own and what Flash will implement.
+multi-phase project. Keep trivial edits with Astra; do not force delegation onto
+a typo or a simple question. For a substantial build, say what Astra will own
+and what Flash will implement. These routing decisions are not alternate modes.
 
 Use the user's existing approvals and decisions. An explicit request to plan and
 build authorizes the in-scope workflow; it is not necessary to ask again after

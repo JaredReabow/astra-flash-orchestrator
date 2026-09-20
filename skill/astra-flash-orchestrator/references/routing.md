@@ -13,18 +13,20 @@ model field. See `sources.md` for the public references.
 
 ## Installation bindings
 
-The installer expects the already-configured `[agents].default_subagent_model`
-to match that route, and verifies it exists in the configured local model catalog.
-It writes a standalone personal agent with the name `astra_flash_builder`, pins
-its model, and uses the existing child effort or the catalog's default effort.
-It leaves root settings, provider URLs, credentials, and config.toml untouched.
+The installer verifies that route exists in the configured local model catalog.
+It writes a standalone personal agent with the name `astra_flash_builder` and
+pins both its model and the catalog's supported default effort. It does not
+require, inherit or change global `[agents].default_subagent_model` or
+`[agents].default_subagent_reasoning_effort` values, so unrelated subagents keep
+their existing defaults. It leaves root settings, provider URLs, credentials,
+and config.toml untouched.
 The child inherits sandbox/approval settings; its `[agents].enabled = false`
 prevents recursive subagent tools under the documented custom-agent format.
 
-The public docs describe custom-agent files under `$CODEX_HOME/agents/`. They
-can override explicit spawn/default values, so choosing a different existing
-custom role may change the model. Never assume all roles use the global child
-default. In particular, keep final review in the root Astra thread.
+The public docs describe custom-agent files under `$CODEX_HOME/agents/`. A named
+role can pin its own model and effort independently of global child defaults.
+Choosing a different existing custom role may therefore change the model. In
+particular, keep final review in the root Astra thread.
 
 ## Runtime check
 

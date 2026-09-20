@@ -12,7 +12,7 @@ class ReleaseTests(unittest.TestCase):
     def test_private_and_backup_files_are_excluded(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            paths = ['README.md', 'skill/tool.py', 'skill/tool.py.before-v1-compat',
+            paths = ['README.md', 'docs/assets/benchmark.svg', 'skill/tool.py', 'skill/tool.py.before-v1-compat',
                      'skill/routing.json', 'skill/.env', '.git/config', 'dist/old.zip',
                      'skill/__pycache__/cache.py', 'auth.json', 'tests/test_synthetic.py']
             for name in paths:
@@ -20,7 +20,7 @@ class ReleaseTests(unittest.TestCase):
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text('fixture')
             names = {p.relative_to(root).as_posix() for p in release.selected(root)}
-            self.assertEqual(names, {'README.md', 'skill/tool.py', 'tests/test_synthetic.py'})
+            self.assertEqual(names, {'README.md', 'docs/assets/benchmark.svg', 'skill/tool.py', 'tests/test_synthetic.py'})
 
     def test_symlinked_distribution_file_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

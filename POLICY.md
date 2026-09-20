@@ -9,7 +9,9 @@ Use one Flash writer by default; do not create an agent for each tiny coding ste
 Prefer this native workflow over an older `flash-build` external-runner skill for
 the same task; do not load both execution paths.
 
-Use thin-root orchestration by default. After establishing the contract, give one
+Thin-root orchestration is the only supported delegated workflow; there is no
+mode selector or alternate full-Astra orchestration setting. After establishing
+the contract, give one
 Flash worker a coherent end-to-end phase bundle and let it own repository discovery,
 implementation, testing, debugging, and routine browser/visual QA inside that
 scope. Astra should normally perform one planning batch, one dispatch, one wait,

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0 — Measured workflow and simpler installation
+
+- Add a measured efficiency graphic, per-token price comparison and transparent
+  benchmark methodology to the README.
+- Document thin orchestration as the only supported delegated workflow, not a
+  user-selectable mode, while retaining direct handling for trivial work and
+  targeted high-assurance review.
+- Reduce the normal terminal installation path to a guarded preview and apply;
+  keep the offline test suite as optional local verification.
+- Remove the unnecessary global subagent-default prerequisite. The installer
+  now relies only on its named role's pinned worker settings and explicitly
+  warns installation agents not to edit shared Codex model defaults.
+- Include SVG documentation assets in release archives.
+
 ## 1.1.0 — Thin-root orchestration by default
 
 - Keep Astra to a planning batch, one worker dispatch/wait, one batched acceptance review and the final response for normal phases.

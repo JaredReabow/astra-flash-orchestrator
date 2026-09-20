@@ -12,6 +12,9 @@ Router URLs, authentication contents or unrelated instructions.
 Preserve my current Astra root model and reasoning effort, existing Router,
 config.toml, authentication, permissions and unrelated instructions. Do not
 install another runtime, dependencies or Router, restart services, or quit Codex.
+Do not add, change or remove [agents].default_subagent_model or
+[agents].default_subagent_reasoning_effort. The package's named role pins its own
+worker model and catalog-supported effort.
 
 Verify Python 3.11+, native subagent/custom-role client support, and the existing
 worker route deepseek/deepseek-v4.1-flash in the effective configuration/catalog.

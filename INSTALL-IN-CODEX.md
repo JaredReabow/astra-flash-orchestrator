@@ -5,6 +5,9 @@ Give Codex the location of this repository and the prompt below. This authorizat
 ```text
 Install Astra + Flash for Codex from this repository.
 
+Use worker route deepseek/deepseek-v4.1-flash unless I explicitly name another
+route documented in this repository. Do not infer or auto-select a billing provider.
+
 Read README.md, install.py, POLICY.md and WORKER-INSTRUCTIONS.md first.
 Inspect relevant local configuration without printing secrets, full private
 Router URLs, authentication contents or unrelated instructions.
@@ -16,8 +19,9 @@ Do not add, change or remove [agents].default_subagent_model or
 [agents].default_subagent_reasoning_effort. The package's named role pins its own
 worker model and catalog-supported effort.
 
-Verify Python 3.11+, native subagent/custom-role client support, and the existing
-worker route deepseek/deepseek-v4.1-flash in the effective configuration/catalog.
+Verify Python 3.11+, native subagent/custom-role client support, and the selected
+worker route in the effective configuration/catalog. Pass it to install.py with
+--worker-route when it is not the direct DeepSeek default.
 The default python3 may be older than 3.11; find an existing 3.11+ interpreter
 such as python3.12 and use it for every command here. Do not install or upgrade a
 runtime to satisfy this.
@@ -27,6 +31,12 @@ Do not silently change models/providers or bypass preflight.
 Never edit config.toml to make a preflight check pass. Report the discrepancy and
 stop. Appending a table header such as [agents] to config.toml absorbs every
 top-level key written after it and can stop Codex loading its config at all.
+
+I will enter any provider API key myself through the Router's private local prompt.
+Do not ask me to paste a key into chat, inspect credential contents, or enter a key
+for me. Do not run subagents certify, test-model --live, a Router smoke test or any
+other paid inference command during installation. If the selected route is not
+already advertised with multi_agent_version v2, stop and report that prerequisite.
 
 Run the offline tests, then install.py for a dry run. If they pass and the
 proposed files match the documented scope, apply with install.py --apply.

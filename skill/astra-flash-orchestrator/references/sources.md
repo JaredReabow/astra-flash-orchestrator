@@ -1,6 +1,6 @@
 # Sources and provenance
 
-Public documentation checked September 17, 2026. These are original package
+Public documentation checked September 20, 2026. These are original package
 instructions and utilities, not a copy or distribution of Superpowers or Codex
 Router. Upstream documentation and local client behavior may change independently.
 
@@ -19,10 +19,15 @@ Router. Upstream documentation and local client behavior may change independentl
 
 - [Codex Router repository](https://github.com/duolahypercho/codex-router): published
   provider-specific model IDs, preserved native routing, local catalog/URL setup.
+- [Codex Router V4.1 Flash route tests](https://github.com/duolahypercho/codex-router/blob/main/test/deepseek-v4-1-flash.test.mjs):
+  reviewed provider slugs and upstream model mappings for DeepSeek, OpenRouter,
+  opencode Go, Command Code, Nous Research and Ollama Cloud.
 - [Codex Router installation guide](https://github.com/duolahypercho/codex-router/blob/main/docs/INSTALL.md):
   health/doctor process and explicit paid smoke-test distinction.
 - [DeepSeek models](https://api-docs.deepseek.com/quick_start/pricing/): direct API
   name deepseek-flash and the documented V4.1 Flash version association.
+- [OpenRouter DeepSeek V4.1 Flash](https://openrouter.ai/deepseek/deepseek-v4.1-flash):
+  OpenRouter model identity, provider routing and tool support.
 - [Superpowers brainstorming](https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md):
   discovery/design before implementation.
 - [Superpowers writing-plans](https://github.com/obra/superpowers/blob/main/skills/writing-plans/SKILL.md):

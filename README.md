@@ -85,15 +85,35 @@ Before installing, you need:
 1. A Codex client that supports native subagents and standalone custom agent TOML files under `$CODEX_HOME/agents/`.
 2. GPT-6 Astra selected as the root model.
 3. Python **3.11 or newer**. No third-party Python dependencies are needed.
-4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for the exact route `deepseek/deepseek-v4.1-flash`.
-5. A local Codex model catalog advertising that route with `multi_agent_version: "v2"`.
+4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for one reviewed DeepSeek V4.1 Flash route below.
+5. A local Codex model catalog advertising that exact route with `multi_agent_version: "v2"`.
+
+| Provider | Worker route |
+| --- | --- |
+| DeepSeek API (default) | `deepseek/deepseek-v4.1-flash` |
+| OpenRouter | `openrouter/deepseek-v4.1-flash` |
+| opencode Go | `opencode-go/deepseek-v4.1-flash` |
+| Command Code | `commandcode/deepseek-v4.1-flash` |
+| Nous Research | `nousresearch/deepseek-v4.1-flash` |
+| Ollama Cloud | `ollama-cloud/deepseek-v4.1-flash` |
+
+Provider credentials are entered by you through Codex Router's private local
+prompt before installing this package. Never paste an API key into an assistant
+chat. This installer never asks for, reads, stores or validates provider keys.
+
+> **Do not spend API credit during installation.** Installing this package does
+> not authorize an assistant to run `subagents certify`, `test-model --live`, a
+> Router smoke test or any other paid inference probe. If the selected route is
+> absent or is not already advertised as `v2`, the installer stops and reports
+> the prerequisite. Decide separately whether to certify a route yourself.
 
 Do **not** add or change `[agents].default_subagent_model` for this package. The
-installer creates a named `astra_flash_builder` role that pins its own model and
+installer creates a named `astra_flash_builder` role that pins its own route and
 catalog-supported effort, so unrelated subagents keep their existing defaults.
 The installer **does not install the Router, add credentials, select your root
-model, or rewrite `config.toml`**. If the required route is unavailable, it stops
-instead of silently choosing another provider.
+model, or rewrite `config.toml`**. Direct DeepSeek remains the default. Any other
+provider requires an explicit `--worker-route`; if that route is unavailable,
+installation stops instead of silently choosing another provider.
 
 The installer supports loopback Router URLs using `/v1` or `/_codex-router/<capability>/v1`. It rejects remote hosts, embedded credentials, queries, fragments and unexpected paths. Client/project/UI overrides still need checking in your actual session. Router subagent selection enables discovery; it does not prove successful inference. Some Router enable commands automatically launch paid verification, so inspect the installed version before changing selection. This installer never enables routes or runs those probes.
 
@@ -122,6 +142,17 @@ That is the normal installation path. The first command changes nothing. The
 second repeats preflight, installs atomically, backs up existing instructions and
 prints a guarded undo receipt. It does not change your root model, Router,
 credentials, permissions or reasoning effort.
+
+To use an already-configured alternate provider, pass its exact route to both
+commands. For OpenRouter:
+
+```sh
+python3 -B install.py --worker-route openrouter/deepseek-v4.1-flash
+python3 -B install.py --worker-route openrouter/deepseek-v4.1-flash --apply
+```
+
+The option selects an existing catalog route; it does not configure the provider,
+collect a key, certify the model or make an inference request.
 
 ### With Codex
 
@@ -181,13 +212,17 @@ python3 -B skill/astra-flash-orchestrator/scripts/doctor.py
 python3 -B skill/astra-flash-orchestrator/scripts/doctor.py --check-local-router
 ```
 
+An installed copy reads its generated `routing.json`, so doctor checks the same
+route automatically. Pass `--worker-route` only when running doctor from a fresh
+source checkout or intentionally checking a different reviewed route.
+
 The first checks local configuration/catalog data. The optional second command makes only a local `/models` GET, with proxies and redirects disabled. It does not read authentication files or attach credentials; an authenticated Router may reject it even when normal Codex requests work. Do not disable Router authentication to make this check pass.
 
 Neither check proves paid inference works. See [troubleshooting](docs/TROUBLESHOOTING.md) and [validation evidence](docs/VALIDATION.md).
 
 ## Updating and uninstalling
 
-For an update, download the new source, run its tests, and preview `python3 -B install.py --replace`. Review the differences before applying with `--replace --apply`. Existing package-owned files are backed up; unrelated files are not deleted. Do not edit generated `routing.json` or the agent model to force a different provider through preflight.
+For an update, download the new source, run its tests, and preview `python3 -B install.py --replace`. Review the differences before applying with `--replace --apply`. Existing package-owned files are backed up; unrelated files are not deleted. An existing valid `routing.json` preserves the installed provider when `--worker-route` is omitted. Pass the option explicitly only to change providers, and review that replacement before applying it. Do not edit generated `routing.json` or the agent model to force a different provider through preflight.
 
 Preview undo using the exact receipt printed during installation:
 

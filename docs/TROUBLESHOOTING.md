@@ -6,7 +6,17 @@ Check that installation ended with `Installed` or `Already installed`, not only 
 
 ## Expected worker route is missing or different
 
-This package intentionally targets `deepseek/deepseek-v4.1-flash`. Establish the Router/provider configuration using the Router's own documentation first. An entry in a model catalog alone does not establish credentials or paid inference access. The installer does not silently substitute a provider.
+The direct default is `deepseek/deepseek-v4.1-flash`. A new alternate-provider
+install requires the exact documented `--worker-route`. An installed doctor or
+later update reuses the valid generated routing binding automatically; a doctor
+run from a fresh source checkout needs the option again. Establish the
+Router/provider configuration using the Router's own documentation first. An
+entry in a model catalog alone does not establish credentials or paid inference
+access. The installer does not auto-detect or silently substitute a provider.
+
+Enter API keys yourself through the Router's private local prompt; never paste
+one into assistant chat. If the route is absent, stop package installation and
+finish provider setup separately.
 
 ## Router URL is rejected
 
@@ -38,4 +48,11 @@ Provider usage and real task outcomes determine cost and quality. Offline tests 
 
 ## Flash is visible in the picker but unavailable for delegation
 
-The merged catalog must advertise the exact route with `multi_agent_version: "v2"`. A model entry or default-subagent setting alone is insufficient. Use the installed Router's documented selection and catalog publication controls, then fully quit/reopen the app. Review commands first: some versions launch paid background verification when a route is enabled. Do not run that under a no-paid-tests instruction. Do not manually falsify certification records or claim selection proves capability.
+The merged catalog must advertise the exact selected route with
+`multi_agent_version: "v2"`. A model entry or default-subagent setting alone is
+insufficient. Use the installed Router's documented selection and catalog
+publication controls, then fully quit/reopen the app. Do not let an installation
+assistant run `subagents certify`, `test-model --live`, a smoke test or another
+paid probe to make this check pass. Decide separately whether to spend provider
+credit on certification yourself. Do not manually falsify certification records
+or claim selection proves runtime capability.

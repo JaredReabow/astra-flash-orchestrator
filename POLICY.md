@@ -42,6 +42,7 @@ exception triggered by evidence, not the routine operating mode.
 Do not switch the root to Flash, silently fall back to a different worker model,
 launch another agent CLI, loosen permissions, expose secrets, auto-commit,
 push, deploy, or start paid setup smoke tests. Normal delegated implementation
-uses the configured DeepSeek provider; obey the user's data-sharing and spending
-restrictions. Installation is not evidence of a successful routed model request.
+uses the provider pinned by the installed V4.1 Flash route; obey the user's
+data-sharing and spending restrictions. Installation is not evidence of a
+successful routed model request.
 <!-- END astra-flash-orchestrator managed policy -->

@@ -17,17 +17,16 @@ the completed patch and evidence to Astra for one focused acceptance pass.
 
 ## Measured efficiency
 
-In one substantial field build, the thin workflow used **98.9% less Astra input
-per 1,000 implementation and test lines** than the all-Astra baseline. It did
-that by moving the implementation loop—not the important decisions—to Flash.
+In one substantial field build, Astra Flash Orchestrator used **98.9% less Astra
+input per 1,000 implementation and test lines** than the all-Astra baseline. It
+did that by moving the implementation loop—not the important decisions—to Flash.
 Total API-equivalent compute per 1,000 lines was **97.0–97.7% lower**, while the
 measured phase produced 39% more implementation and test lines.
 
 | Workflow | Astra input per 1K implementation lines | Total compute per 1K lines |
 | --- | ---: | ---: |
 | All Astra | 8.56M | $11.32 |
-| Original orchestration | 3.02M | $3.88–$3.99 |
-| Thin orchestration | **95.9K** | **$0.26–$0.34** |
+| Astra + DeepSeek V4.1 Flash | **95.9K** | **$0.26–$0.34** |
 
 The per-token price difference explains why delegating implementation has so
 much leverage:
@@ -54,7 +53,7 @@ Astra  →  review + verify + accept or request fixes
 
 - **Native delegation:** uses the `astra_flash_builder` role, not a separate agent CLI.
 - **Coherent assignments:** one feature slice can include many edit/test/fix steps.
-- **Thin Astra root:** normally one planning batch, one dispatch, one wait, one
+- **Focused Astra root:** normally one planning batch, one dispatch, one wait, one
   batched acceptance review and one final response.
 - **Worker-owned execution:** Flash handles in-scope discovery, implementation,
   testing, debugging and routine browser/visual QA without progress polling.
@@ -65,15 +64,14 @@ Astra  →  review + verify + accept or request fixes
 
 This is workflow guidance, not a deterministic scheduler, a security sandbox, or a guarantee of model quality or cost savings. It is independent of OpenAI, DeepSeek and Codex Router.
 
-### One supported orchestration workflow
+### One orchestration workflow
 
-There is no mode setting or mode-switch command. **Thin orchestration is the only
-supported delegated workflow.** The word “thin” distinguishes the current design
-from the more Astra-heavy workflow used before version 1.1.0.
+There is no mode setting or mode-switch command. The package always uses the
+usage-saving Astra → Flash → Astra workflow for substantial implementation.
 
 Three routing outcomes remain intentionally different:
 
-- Substantial implementation uses the thin Astra → Flash → Astra workflow.
+- Substantial implementation uses Astra to plan and review while Flash builds.
 - Trivial work and explicit single-agent requests stay with the root session.
 - Concrete security, architecture, payments, tenancy, secrets, migration or
   production risk can justify targeted additional Astra review.
@@ -165,7 +163,7 @@ Root model/effort, provider configuration, authentication and existing permissio
 
 ```text
 $astra-flash-orchestrator Use the existing plan in docs/plan.md to implement
-this feature. Keep Astra as the thin orchestrator and reviewer. Use one installed
+this feature. Keep Astra focused on planning and final review. Use one installed
 Flash builder for a coherent implementation and verification bundle. Do not poll
 the worker; review its completed patch and evidence in one batched pass.
 ```

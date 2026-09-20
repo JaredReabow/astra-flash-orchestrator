@@ -19,28 +19,23 @@
 
   <line x1="72" y1="302" x2="1128" y2="302" stroke="#ddddda"/>
 
-  <rect x="72" y="334" width="320" height="194" rx="16" fill="#ffffff" stroke="#ddddda"/>
-  <text x="98" y="372" fill="#666663" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="0.7">ALL ASTRA</text>
-  <text x="98" y="424" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="43" font-weight="700">8.56M</text>
-  <text x="98" y="450" fill="#666663" font-family="Arial, Helvetica, sans-serif" font-size="14">Astra input tokens</text>
-  <line x1="98" y1="474" x2="366" y2="474" stroke="#ececea"/>
-  <text x="98" y="505" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">$11.32 / 1K lines</text>
+  <rect x="72" y="334" width="508" height="194" rx="16" fill="#ffffff" stroke="#ddddda"/>
+  <text x="98" y="372" fill="#666663" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="0.7">ALL-ASTRA WORKFLOW</text>
+  <text x="98" y="424" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="700">8.56M</text>
+  <text x="98" y="450" fill="#666663" font-family="Arial, Helvetica, sans-serif" font-size="14">Astra plans and implements</text>
+  <line x1="98" y1="474" x2="554" y2="474" stroke="#ececea"/>
+  <text x="98" y="505" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">$11.32 / 1K lines</text>
+  <text x="554" y="505" fill="#777773" font-family="Arial, Helvetica, sans-serif" font-size="14" text-anchor="end">Astra input</text>
 
-  <rect x="416" y="334" width="320" height="194" rx="16" fill="#ffffff" stroke="#ddddda"/>
-  <text x="442" y="372" fill="#666663" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="0.7">ORIGINAL ORCHESTRATION</text>
-  <text x="442" y="424" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="43" font-weight="700">3.02M</text>
-  <text x="442" y="450" fill="#666663" font-family="Arial, Helvetica, sans-serif" font-size="14">Astra input tokens</text>
-  <line x1="442" y1="474" x2="710" y2="474" stroke="#ececea"/>
-  <text x="442" y="505" fill="#171717" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">$3.88-$3.99 / 1K lines</text>
-
-  <rect x="760" y="334" width="368" height="194" rx="16" fill="#eaf6f1" stroke="#a9d8c7"/>
-  <text x="786" y="372" fill="#14825f" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="0.7">THIN ORCHESTRATION</text>
+  <rect x="608" y="334" width="520" height="194" rx="16" fill="#eaf6f1" stroke="#a9d8c7"/>
+  <text x="634" y="372" fill="#14825f" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="0.7">ASTRA + DEEPSEEK V4.1 FLASH</text>
   <rect x="1015" y="351" width="87" height="27" rx="13.5" fill="#14825f"/>
   <text x="1058.5" y="369" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700" text-anchor="middle">CURRENT</text>
-  <text x="786" y="424" fill="#14825f" font-family="Arial, Helvetica, sans-serif" font-size="43" font-weight="700">95.9K</text>
-  <text x="786" y="450" fill="#4f7165" font-family="Arial, Helvetica, sans-serif" font-size="14">Astra input tokens</text>
-  <line x1="786" y1="474" x2="1102" y2="474" stroke="#c9e3da"/>
-  <text x="786" y="505" fill="#14825f" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">$0.26-$0.34 / 1K lines</text>
+  <text x="634" y="424" fill="#14825f" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="700">95.9K</text>
+  <text x="634" y="450" fill="#4f7165" font-family="Arial, Helvetica, sans-serif" font-size="14">Astra decides and reviews. Flash builds.</text>
+  <line x1="634" y1="474" x2="1102" y2="474" stroke="#c9e3da"/>
+  <text x="634" y="505" fill="#14825f" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700">$0.26-$0.34 / 1K lines</text>
+  <text x="1102" y="505" fill="#4f7165" font-family="Arial, Helvetica, sans-serif" font-size="14" text-anchor="end">Astra + Flash input</text>
 
   <text x="72" y="570" fill="#777773" font-family="Arial, Helvetica, sans-serif" font-size="13">One measured field build. API-equivalent estimates, not guaranteed subscription savings.</text>
   <text x="1128" y="570" fill="#777773" font-family="Arial, Helvetica, sans-serif" font-size="13" text-anchor="end">See docs/BENCHMARK.md</text>

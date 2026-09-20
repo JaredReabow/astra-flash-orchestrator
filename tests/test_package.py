@@ -202,7 +202,55 @@ class SetupFixture(unittest.TestCase):
             'openai_base_url = "http://127.0.0.1:4202/v1"\n'
             'model_catalog_json = "catalog.json"\n'
         )
-        with self.assertRaisesRegex(SetupError, r'placed inside \[agents\].*openai_base_url'):
+        with self.assertRaisesRegex(SetupError, r'do not belong under \[agents\].*openai_base_url'):
+            self.report()
+
+    def test_absorbed_key_is_caught_by_shape_not_by_a_known_name_list(self):
+        # Regression for a real incident: an agent satisfying an older installer
+        # prerequisite appended [agents] to config.toml, which absorbed the two
+        # top-level realtime keys that followed it. Codex refused to load the
+        # config, taking down the host app and the CLI. Neither key is a
+        # plausible member of a list of anticipated top-level names, so the
+        # guard has to reject them on shape.
+        self.config.write_text(
+            'model = "fixture-astra-root"\n'
+            'openai_base_url = "http://127.0.0.1:4202/v1"\n'
+            'model_catalog_json = "catalog.json"\n'
+            '[agents]\n'
+            'default_subagent_model = "fixture-other-model"\n'
+            'experimental_realtime_webrtc_call_base_url = "https://example.invalid/backend-api/codex"\n'
+            'experimental_realtime_ws_base_url = "https://example.invalid/v1"\n'
+        )
+        with self.assertRaisesRegex(
+            SetupError,
+            r'experimental_realtime_webrtc_call_base_url, experimental_realtime_ws_base_url',
+        ):
+            self.report()
+
+    def test_recognized_agent_settings_and_role_tables_are_accepted(self):
+        # The guard must not fire on a legitimate [agents] table: Codex accepts
+        # these scalars there, and any other key is an agent name owning a table.
+        self.config.write_text(
+            self.config.read_text()
+            + '[agents]\n'
+            'enabled = true\n'
+            'default_subagent_model = "fixture-other-model"\n'
+            'default_subagent_reasoning_effort = "high"\n'
+            'max_concurrent_threads_per_session = 6\n'
+            'max_depth = 2\n'
+            'job_max_runtime_seconds = 600\n'
+            f'[agents.{ROLE}]\n'
+            'description = "fixture role"\n'
+        )
+        self.assertEqual(self.report()['status'], 'static-ready')
+
+    def test_agent_name_holding_a_scalar_is_rejected(self):
+        # An agent name must own a role table; a bare scalar is the exact shape
+        # Codex rejects with "expected struct AgentRoleToml".
+        self.config.write_text(
+            self.config.read_text() + '[agents]\nastra_flash_builder = "not-a-table"\n'
+        )
+        with self.assertRaisesRegex(SetupError, r'do not belong under \[agents\].*astra_flash_builder'):
             self.report()
 
     def test_standalone_profile_is_read_without_modifying_it(self):

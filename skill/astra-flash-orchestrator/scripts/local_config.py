@@ -27,7 +27,9 @@ AGENT_SCALAR_SETTINGS = frozenset({
     "enabled",
     "default_subagent_model",
     "default_subagent_reasoning_effort",
+    "interrupt_message",
     "max_concurrent_threads_per_session",
+    "max_threads",
     "max_depth",
     "job_max_runtime_seconds",
 })

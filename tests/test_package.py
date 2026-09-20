@@ -244,6 +244,13 @@ class SetupFixture(unittest.TestCase):
         )
         self.assertEqual(self.report()['status'], 'static-ready')
 
+    def test_documented_interrupt_and_legacy_thread_settings_are_accepted(self):
+        original = self.config.read_text()
+        for setting in ('interrupt_message = false', 'max_threads = 4'):
+            with self.subTest(setting=setting):
+                self.config.write_text(original + f'[agents]\n{setting}\n')
+                self.assertEqual(self.report()['status'], 'static-ready')
+
     def test_agent_name_holding_a_scalar_is_rejected(self):
         # An agent name must own a role table; a bare scalar is the exact shape
         # Codex rejects with "expected struct AgentRoleToml".

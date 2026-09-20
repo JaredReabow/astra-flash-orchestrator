@@ -1,20 +1,26 @@
 # Astra Flash Orchestrator
 
-**Astra plans and reviews. DeepSeek Flash implements.**
+**Save Astra for the decisions that need it. Let DeepSeek V4.1 Flash do the volume.**
 
 ![Astra Flash Orchestrator measured efficiency](docs/assets/astra-savings.svg)
 
-A personal Codex skill that turns an approved plan into substantial implementation tasks, delegates them through your existing Codex Router, and keeps architecture, verification and acceptance with Astra.
+A personal Codex skill designed to preserve Astra usage without giving up Astra's
+judgment. Astra stays responsible for planning, architecture, high-stakes
+decisions and final review. DeepSeek V4.1 Flash takes the high-volume work:
+repository discovery, implementation, testing, debugging and routine verification.
 
-Bring an existing plan or start with a feature request. The workflow covers specification, dependency-ordered tasks, implementation, review, corrections and resumable checkpoints.
+Bring an existing plan or start with a feature request. The workflow turns it
+into coherent implementation bundles, sends those bundles to Flash, then returns
+the completed patch and evidence to Astra for one focused acceptance pass.
 
 > **Status:** early release. Offline installation tests pass, and the workflow has completed a measured local field build. Results below describe that run, not guaranteed savings. A new installation still needs runtime routing verification on its first authorized task. Installation never runs paid inference.
 
 ## Measured efficiency
 
 In one substantial field build, the thin workflow used **98.9% less Astra input
-per 1,000 implementation and test lines** than the all-Astra baseline. Total
-API-equivalent compute per 1,000 lines was **97.0–97.7% lower**, while the
+per 1,000 implementation and test lines** than the all-Astra baseline. It did
+that by moving the implementation loop—not the important decisions—to Flash.
+Total API-equivalent compute per 1,000 lines was **97.0–97.7% lower**, while the
 measured phase produced 39% more implementation and test lines.
 
 | Workflow | Astra input per 1K implementation lines | Total compute per 1K lines |

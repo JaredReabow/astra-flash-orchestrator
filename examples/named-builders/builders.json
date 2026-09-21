@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "note": "Reference table for install.py --builder. A test asserts this file matches the preset module.",
+  "builders": [
+    {
+      "preset": "grok",
+      "role": "astra_terra_builder_grok",
+      "label": "Astra/Terra builder Grok",
+      "default_route": "grok-oauth/grok-4.6",
+      "allowed_routes": ["grok-oauth/grok-4.6", "grok-oauth/grok-4.5"],
+      "allow_local": false
+    },
+    {
+      "preset": "fable",
+      "role": "astra_terra_builder_fable",
+      "label": "Astra/Terra builder Fable",
+      "default_route": "openrouter/claude-fable-5.1",
+      "allowed_routes": ["openrouter/claude-fable-5.1"],
+      "allow_local": false
+    },
+    {
+      "preset": "deepseek-flash",
+      "role": "astra_terra_builder_deepseek_flash",
+      "label": "Astra/Terra builder DeepSeek Flash",
+      "default_route": "deepseek/deepseek-v4.1-flash",
+      "allowed_routes": ["deepseek/deepseek-v4.1-flash"],
+      "allow_local": false
+    },
+    {
+      "preset": "deepseek-pro",
+      "role": "astra_terra_builder_deepseek_pro",
+      "label": "Astra/Terra builder DeepSeek Pro",
+      "default_route": "deepseek/deepseek-v4-pro",
+      "allowed_routes": ["deepseek/deepseek-v4-pro"],
+      "allow_local": false
+    },
+    {
+      "preset": "grok-4-5",
+      "role": "astra_terra_builder_grok_4_5",
+      "label": "Astra/Terra builder Grok 4.5",
+      "default_route": "grok-oauth/grok-4.5",
+      "allowed_routes": ["grok-oauth/grok-4.5"],
+      "allow_local": false
+    },
+    {
+      "preset": "ollama",
+      "role": "astra_terra_builder_ollama",
+      "label": "Astra/Terra builder Ollama (local)",
+      "default_route": null,
+      "allowed_routes": [],
+      "allow_local": true
+    }
+  ]
+}

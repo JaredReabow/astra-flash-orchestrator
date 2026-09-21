@@ -14,6 +14,21 @@ Router/provider configuration using the Router's own documentation first. An
 entry in a model catalog alone does not establish credentials or paid inference
 access. The installer does not auto-detect or silently substitute a provider.
 
+The same option accepts `deepseek/deepseek-v4-pro`, `grok-oauth/grok-4.6`,
+`grok-oauth/grok-4.5`, `openrouter/claude-fable-5.1` and a configured
+`local/<ollama-tag>` route. A slug that is not one of those and does not look like
+a local Ollama tag is refused before any file is written, so a typo cannot quietly
+install a different provider. The role name stays `astra_flash_builder` whatever
+route is pinned.
+
+Ollama cloud aliases (`<model>:cloud` and `<model>:<size>b-cloud`) are refused
+under `local/` with their own message. Those variants are served from Ollama's
+cloud, so pinning one as `local/...` would label remote inference as on-machine.
+Use the Router's `ollama-cloud` provider route instead. More generally, a `local/`
+slug only records the namespace the Router published: it is not evidence that the
+weights run on this machine. Confirm locality from your own Ollama/runtime
+evidence, not from the slug.
+
 Enter API keys yourself through the Router's private local prompt; never paste
 one into assistant chat. If the route is absent, stop package installation and
 finish provider setup separately.
@@ -46,7 +61,7 @@ This protects later edits, including changes to the shared personal AGENTS file.
 
 Provider usage and real task outcomes determine cost and quality. Offline tests validate installation and planning helpers, not the performance of either model. Request metadata is routing evidence; a worker's self-description is not.
 
-## Flash is visible in the picker but unavailable for delegation
+## The worker route is visible in the picker but unavailable for delegation
 
 The merged catalog must advertise the exact selected route with
 `multi_agent_version: "v2"`. A model entry or default-subagent setting alone is
@@ -56,3 +71,11 @@ assistant run `subagents certify`, `test-model --live`, a smoke test or another
 paid probe to make this check pass. Decide separately whether to spend provider
 credit on certification yourself. Do not manually falsify certification records
 or claim selection proves runtime capability.
+
+Two cases are easy to misread. `grok-oauth/grok-4.5` is checked into the Router
+with a `v2` certificate but the published catalog lists it as `v1`, so it stays
+blocked until that route is enabled through the Router's own controls. Local Ollama
+models are normally absent from the catalog until the operator enables them, and
+the Router's default for a local entry is `v1`; a `local/<tag>` route installs only
+once that exact model is enabled and republished as `v2`. In both cases the fix
+belongs in the Router, not in this package.

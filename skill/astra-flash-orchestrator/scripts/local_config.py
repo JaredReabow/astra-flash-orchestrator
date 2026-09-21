@@ -14,8 +14,15 @@ if sys.version_info < (3, 11):
     raise SystemExit("Python 3.11+ is required. No packages or settings were changed.")
 import tomllib
 
-ROUTE = "deepseek/deepseek-v4.1-flash"
-SUPPORTED_ROUTES = {
+# The installed default. Existing bindings, docs and the published policy point
+# at this slug, so it stays first and stays the fallback when no explicit route
+# and no installed binding exist.
+DEFAULT_ROUTE = "deepseek/deepseek-v4.1-flash"
+ROUTE = DEFAULT_ROUTE
+
+# Reviewed DeepSeek V4.1 Flash routes. These are the package's original
+# provider set: cheap, tool-capable and the reason the role exists.
+FLASH_ROUTES = {
     ROUTE: "DeepSeek API",
     "openrouter/deepseek-v4.1-flash": "OpenRouter",
     "opencode-go/deepseek-v4.1-flash": "opencode Go",
@@ -23,8 +30,111 @@ SUPPORTED_ROUTES = {
     "nousresearch/deepseek-v4.1-flash": "Nous Research",
     "ollama-cloud/deepseek-v4.1-flash": "Ollama Cloud",
 }
+
+# Additional reviewed worker routes an operator may pin explicitly. Nothing here
+# is selected automatically: a route is used only when it is named with
+# --worker-route or already recorded in a valid installed routing binding.
+# Provider labels match the Router's own provider configuration.
+MULTI_MODEL_ROUTES = {
+    "deepseek/deepseek-v4-pro": "DeepSeek API",
+    "grok-oauth/grok-4.6": "xAI Grok OAuth",
+    "grok-oauth/grok-4.5": "xAI Grok OAuth",
+    "openrouter/claude-fable-5.1": "OpenRouter",
+}
+
+SUPPORTED_ROUTES = {**FLASH_ROUTES, **MULTI_MODEL_ROUTES}
+
+# Local Ollama routes are dynamic: the Router publishes one slug per model the
+# operator has enabled, as `local/<ollama-tag>`. The tag grammar below is the
+# Router's own (src/local-model-ref.mjs), so a route this package accepts is a
+# route the Router could have produced. Membership is still decided by the live
+# catalog, never by the shape alone.
+LOCAL_ROUTE_PREFIX = "local/"
+LOCAL_ROUTE_PROVIDER = "Local (Ollama)"
+LOCAL_TAG_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$")
+
+# Ollama's cloud aliases are captured in the Router's local-model manifest with
+# `codex: "cloud-only"` and `downloadable: false`: the plain `<model>:cloud`
+# alias and the sized `<model>:<size>b-cloud` variant. They are served by
+# Ollama's cloud and have no weights on this machine, so a `local/` slug must
+# never carry one. A prefix is a namespace, not proof of where inference runs.
+LOCAL_CLOUD_VARIANT = "cloud"
+LOCAL_CLOUD_VARIANT_SUFFIX = "-cloud"
+
 ROLE = "astra_flash_builder"
 SKILL = "astra-flash-orchestrator"
+
+
+def _local_route_candidate(route: str) -> str | None:
+    """Return the tag text of anything shaped like a local route, cloud included."""
+    if not route.startswith(LOCAL_ROUTE_PREFIX):
+        return None
+    tag = route[len(LOCAL_ROUTE_PREFIX):]
+    if not tag or "//" in tag or not LOCAL_TAG_PATTERN.fullmatch(tag):
+        return None
+    return tag
+
+
+def local_route_cloud_variant(route: str) -> str | None:
+    """Return the Ollama cloud variant a local-shaped route names, if any."""
+    tag = _local_route_candidate(route)
+    if tag is None or ":" not in tag:
+        return None
+    variant = tag.rsplit(":", 1)[1]
+    if variant == LOCAL_CLOUD_VARIANT or variant.endswith(LOCAL_CLOUD_VARIANT_SUFFIX):
+        return variant
+    return None
+
+
+def local_route_tag(route: str) -> str | None:
+    """Return a local-namespace tag after excluding known cloud aliases."""
+    tag = _local_route_candidate(route)
+    if tag is None or local_route_cloud_variant(route) is not None:
+        return None
+    return tag
+
+
+def route_provider(route: str) -> str | None:
+    """Return the provider label for a route, or None when it is not reviewed."""
+    if route in SUPPORTED_ROUTES:
+        return SUPPORTED_ROUTES[route]
+    if local_route_tag(route) is not None:
+        return LOCAL_ROUTE_PROVIDER
+    return None
+
+
+def route_family(route: str) -> str | None:
+    """Classify a route for reporting: flash, cloud, or local."""
+    if route in FLASH_ROUTES:
+        return "flash"
+    if route in SUPPORTED_ROUTES:
+        return "cloud"
+    if local_route_tag(route) is not None:
+        return "local"
+    return None
+
+
+def route_hint() -> str:
+    """Human-readable list of route names this package accepts."""
+    return ", ".join(SUPPORTED_ROUTES) + ", or a configured local/<ollama-tag>"
+
+
+def require_route(route: object) -> str:
+    """Return a reviewed route unchanged, or refuse it without guessing."""
+    if isinstance(route, str):
+        variant = local_route_cloud_variant(route)
+        if variant is not None:
+            raise SetupError(
+                f"The local route {route} names an Ollama cloud alias ({variant}). Those models "
+                "run through Ollama's cloud service rather than on this machine, so they cannot be "
+                "pinned as a local worker route. Use the Router's ollama-cloud provider route for "
+                "that model instead."
+            )
+    if not isinstance(route, str) or route_provider(route) is None:
+        raise SetupError(
+            "Unsupported worker route. Choose one reviewed route explicitly: " + route_hint()
+        )
+    return route
 
 # Keys Codex reads as scalar settings directly under [agents]. Every other key
 # there is read as an agent NAME whose value must be a role table, so a scalar
@@ -92,7 +202,12 @@ def model_id(entry: dict) -> str | None:
 
 
 def resolve_worker_route(requested: str | None = None, binding: Path | None = None) -> str:
-    """Validate an explicit route or reuse this package's existing routing binding."""
+    """Validate an explicit route or reuse this package's existing routing binding.
+
+    An explicit request always wins. Otherwise a valid installed binding is
+    reused; with neither, the installed default is returned. Nothing here
+    discovers or substitutes a provider that the caller did not name.
+    """
     if requested is not None:
         route = requested
     elif binding is None:
@@ -111,12 +226,7 @@ def resolve_worker_route(requested: str | None = None, binding: Path | None = No
             raise SetupError(f"Cannot read the existing routing binding ({type(exc).__name__}).") from None
         if not isinstance(route, str):
             raise SetupError("The existing routing binding does not name a worker model.")
-    if route not in SUPPORTED_ROUTES:
-        raise SetupError(
-            "Unsupported worker route. Choose a reviewed DeepSeek V4.1 Flash route: "
-            + ", ".join(SUPPORTED_ROUTES)
-        )
-    return route
+    return require_route(route)
 
 
 def inspect(
@@ -174,8 +284,22 @@ def inspect(
         warnings.append(
             "The global default_subagent_model is not used or changed; the installed named role pins its own worker model."
         )
-    if config.get("model") in SUPPORTED_ROUTES:
-        raise SetupError("The root model is Flash. Select Astra as root before installing this workflow.")
+    # Retained from 1.2.0 for compatibility: this package's premise is an
+    # orchestrator at the root delegating volume to a cheaper worker, so a Flash
+    # root leaves nothing to save and the documented prerequisite is a non-Flash
+    # root. That is the only root this check forbids. One model serving both roles
+    # is allowed -- the saved default is not proof of what a running session uses,
+    # and the same model can legally be the orchestrator for one task and the
+    # delegated worker for another. Every root value is left exactly as configured.
+    root_model = config.get("model")
+    if isinstance(root_model, str) and root_model in FLASH_ROUTES:
+        raise SetupError("The root model is Flash. Select your orchestrator model as root before installing this workflow.")
+    if isinstance(root_model, str) and root_model and root_model == worker_route:
+        warnings.append(
+            f"The root model is also the selected worker route ({worker_route}). That is allowed and "
+            "nothing here changes the root, but delegation will not change the model, so use a "
+            "separate worker route when you expect a cost or quality difference."
+        )
 
     catalog_value = config.get("model_catalog_json")
     if not isinstance(catalog_value, str) or not catalog_value:
@@ -190,14 +314,14 @@ def inspect(
     matches = [entry for entry in model_entries(payload) if model_id(entry) == worker_route]
     if len(matches) != 1:
         raise SetupError(
-            f"The selected Flash V4.1 route ({worker_route}) is missing or duplicated in the local catalog. "
+            f"The selected worker route ({worker_route}) is missing or duplicated in the local catalog. "
             "Configure that exact route with the Router's own local setup, then rerun this installer. "
             "No provider was substituted."
         )
     entry = matches[0]
     if entry.get("multi_agent_version") != "v2":
         raise SetupError(
-            f"The selected Flash route ({worker_route}) exists in the catalog but is not "
+            f"The selected worker route ({worker_route}) exists in the catalog but is not "
             "advertised for native subagents "
             "(multi_agent_version must be v2). Select this exact route using your "
             "Router's documented subagent settings, republish the catalog, and fully "
@@ -213,7 +337,10 @@ def inspect(
     if effort is not None and (not isinstance(effort, str) or not re.fullmatch(r"[a-z_]+", effort)):
         raise SetupError("The worker reasoning effort is not a recognized string value.")
     if effort is not None and supported and effort not in supported:
-        raise SetupError("The worker effort does not match its catalog's supported efforts. Reconcile it locally first.")
+        raise SetupError(
+            f"The worker effort ({effort}) is not listed in the supported efforts for {worker_route} "
+            "in the local catalog. Reconcile the route locally first."
+        )
     if effort is None:
         warnings.append("No worker effort was pinned; use explicit model selection without an effort at spawn, then inspect the actual thread.")
 
@@ -249,7 +376,8 @@ def inspect(
         "root_model_observed": config.get("model"),
         "root_effort_observed": config.get("model_reasoning_effort"),
         "worker_model": worker_route,
-        "worker_provider": SUPPORTED_ROUTES[worker_route],
+        "worker_provider": route_provider(worker_route),
+        "worker_route_family": route_family(worker_route),
         "worker_effort": effort,
         "custom_agent": ROLE,
         "profile_inspected": selected,

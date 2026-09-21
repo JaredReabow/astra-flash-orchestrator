@@ -1,10 +1,15 @@
 # GitHub release preparation
 
+Release location: this fork is published at
+`https://github.com/JaredReabow/astra-flash-orchestrator`, which tracks upstream
+`https://github.com/ethanplusai/astra-flash-orchestrator`. Keep the upstream
+attribution, license and `SOURCES.md` provenance intact in every release.
+
 Suggested repository name: **astra-flash-orchestrator**
 
 Suggested GitHub description:
 
-> Astra plans and reviews; DeepSeek Flash builds. A native Codex workflow with phased tasks, verification, safe installation and reversible setup.
+> Astra plans and reviews; a reviewed worker route builds, DeepSeek Flash by default. A native Codex workflow with phased tasks, verification, safe installation and reversible setup.
 
 Suggested topics: `codex`, `codex-skills`, `deepseek`, `ai-agents`, `developer-tools`, `agent-orchestration`.
 

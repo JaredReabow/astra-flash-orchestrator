@@ -3,10 +3,12 @@
 Give Codex the location of this repository and the prompt below. This authorization covers only installation, not a real delegated task.
 
 ```text
-Install Astra + Flash for Codex from this repository.
+Install the Astra-led worker workflow for Codex from this repository.
 
 Use worker route deepseek/deepseek-v4.1-flash unless I explicitly name another
-route documented in this repository. Do not infer or auto-select a billing provider.
+route documented in this repository (for example deepseek/deepseek-v4-pro,
+grok-oauth/grok-4.6, grok-oauth/grok-4.5, openrouter/claude-fable-5.1, or a
+configured local/<ollama-tag>). Do not infer, enable or auto-select a provider.
 
 Read README.md, install.py, POLICY.md and WORKER-INSTRUCTIONS.md first.
 Inspect relevant local configuration without printing secrets, full private
@@ -21,7 +23,11 @@ worker model and catalog-supported effort.
 
 Verify Python 3.11+, native subagent/custom-role client support, and the selected
 worker route in the effective configuration/catalog. Pass it to install.py with
---worker-route when it is not the direct DeepSeek default.
+--worker-route when it is not the direct DeepSeek default. The route must appear
+exactly once in that catalog and advertise multi_agent_version v2; if it does not,
+stop and report the prerequisite instead of choosing another route. A route that is
+the same as my root model is allowed: continue, warn me, and leave my root alone.
+Only a root that is itself a DeepSeek V4.1 Flash route is refused.
 The default python3 may be older than 3.11; find an existing 3.11+ interpreter
 such as python3.12 and use it for every command here. Do not install or upgrade a
 runtime to satisfy this.
@@ -44,8 +50,9 @@ I authorize installation of the personal skill, native astra_flash_builder role,
 and scoped managed AGENTS policy exception. Retain repository restrictions,
 explicit no-delegation instructions and managed security controls.
 
-The role must pin Flash, inherit sandbox/approvals and disable nested agents.
-Do not invoke an external worker CLI. Run the static doctor after installation.
+The role must pin the exact route I named, inherit sandbox/approvals and disable
+nested agents. Do not invoke an external worker CLI. Run the static doctor after
+installation.
 An optional local catalog GET may fail when authentication is required; do not
 read or alter credentials to make it pass, or present it as inference evidence.
 

@@ -16,8 +16,9 @@ sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT))
 import install
 from local_config import (
-    ROUTE, ROLE, SKILL, SUPPORTED_ROUTES, SetupError, inspect, model_entries,
-    resolve_worker_route,
+    DEFAULT_ROUTE, FLASH_ROUTES, MULTI_MODEL_ROUTES, ROUTE, ROLE, SKILL, SUPPORTED_ROUTES,
+    SetupError, inspect, local_route_cloud_variant, model_entries, require_route,
+    resolve_worker_route, route_family, route_hint, route_provider,
 )
 from validate_plan import PlanError, validate
 
@@ -113,6 +114,191 @@ class SetupFixture(unittest.TestCase):
         )
         self.assertEqual(routing['worker_model'], route)
         self.assertEqual(routing['worker_provider'], 'OpenRouter')
+
+    def test_required_multi_model_routes_are_registered_without_losing_flash(self):
+        for route in ('deepseek/deepseek-v4-pro', 'grok-oauth/grok-4.6',
+                      'grok-oauth/grok-4.5', 'openrouter/claude-fable-5.1'):
+            with self.subTest(route=route):
+                self.assertIn(route, MULTI_MODEL_ROUTES)
+                self.assertIn(route, SUPPORTED_ROUTES)
+                self.assertIsNotNone(route_provider(route))
+        self.assertEqual(DEFAULT_ROUTE, ROUTE)
+        self.assertEqual(SUPPORTED_ROUTES[DEFAULT_ROUTE], 'DeepSeek API')
+        self.assertIn(DEFAULT_ROUTE, FLASH_ROUTES)
+        self.assertEqual(len(FLASH_ROUTES), 6)
+        self.assertEqual(route_family(DEFAULT_ROUTE), 'flash')
+
+    def test_each_multi_model_route_pins_its_model_provider_and_family(self):
+        for route, provider in MULTI_MODEL_ROUTES.items():
+            with self.subTest(route=route):
+                self.set_catalog_route(route)
+                report, _ = inspect(self.home, self.codex, worker_route=route)
+                self.assertEqual(report['worker_model'], route)
+                self.assertEqual(report['worker_provider'], provider)
+                self.assertEqual(report['worker_route_family'], 'cloud')
+                self.assertEqual(report['worker_effort'], 'high')
+
+    def test_multi_model_route_is_pinned_in_role_and_binding(self):
+        route = 'deepseek/deepseek-v4-pro'
+        self.set_catalog_route(route)
+        result = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], route)
+        self.assertEqual(role['name'], ROLE)
+        routing = json.loads(
+            (self.home / '.agents' / 'skills' / SKILL / 'routing.json').read_text()
+        )
+        self.assertEqual(routing['worker_model'], route)
+        self.assertEqual(routing['worker_provider'], 'DeepSeek API')
+        self.assertEqual(routing['worker_route_family'], 'cloud')
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_local_route_roundtrips_through_the_installed_binding(self):
+        route = 'local/qwen3.8:27b-mlx'
+        self.set_catalog_route(route)
+        first = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(first.returncode, 0, first.stderr)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], route)
+        binding = self.home / '.agents' / 'skills' / SKILL / 'routing.json'
+        routing = json.loads(binding.read_text())
+        self.assertEqual(routing['worker_model'], route)
+        self.assertEqual(routing['worker_provider'], 'Local (Ollama)')
+        self.assertEqual(routing['worker_route_family'], 'local')
+        second = self.cli('--apply')
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertIn('no changes needed', second.stdout)
+        # The doctor path with no explicit route resolves it from the binding.
+        report, _ = inspect(self.home, self.codex, worker_route=resolve_worker_route(binding=binding))
+        self.assertEqual(report['worker_model'], route)
+        self.assertEqual(report['worker_route_family'], 'local')
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_local_route_is_blocked_while_the_router_publishes_it_as_v1(self):
+        # The Router intentionally publishes local Ollama entries as v1.
+        self.set_catalog_route('local/qwen3.8:27b-mlx', 'v1')
+        result = self.cli('--worker-route', 'local/qwen3.8:27b-mlx', '--apply')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('local/qwen3.8:27b-mlx', result.stderr)
+        self.assertIn('not advertised for native subagents', result.stderr)
+        self.assertFalse((self.home / '.agents').exists())
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_local_route_shape_is_validated_before_the_catalog(self):
+        for route in ('local/', 'local', 'local//x', 'local/../config', 'local/-model',
+                      'local/a b', 'local/a::b', 'local/a:b:c', 'local/.hidden'):
+            with self.subTest(route=route):
+                with self.assertRaisesRegex(SetupError, 'Unsupported worker route'):
+                    require_route(route)
+
+    def test_local_route_shape_accepts_the_router_tag_grammar(self):
+        for route, provider in {'local/gemma4:12b': 'Local (Ollama)',
+                                'local/hf.co/user/repo:Q4_K_M': 'Local (Ollama)',
+                                'local/qwen3.8:27b-mlx': 'Local (Ollama)'}.items():
+            with self.subTest(route=route):
+                self.assertEqual(require_route(route), route)
+                self.assertEqual(route_provider(route), provider)
+                self.assertEqual(route_family(route), 'local')
+
+    def test_grok_45_stays_blocked_at_v1_and_installs_once_advertised_as_v2(self):
+        route = 'grok-oauth/grok-4.5'
+        self.set_catalog_route(route, 'v1')
+        blocked = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn(route, blocked.stderr)
+        self.assertIn('multi_agent_version must be v2', blocked.stderr)
+        self.assertFalse((self.home / '.agents').exists())
+        self.set_catalog_route(route, 'v2')
+        installed = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], route)
+        self.assertEqual(role['model_reasoning_effort'], 'high')
+
+    def test_unknown_or_malformed_route_is_refused_before_any_write(self):
+        for route in ('custom/deepseek-v4.1-flash', 'grok-oauth/grok-9.9', 'deepseek/v4-pro',
+                      'DEEPSEEK/deepseek-v4-pro', 'local', ''):
+            with self.subTest(route=route):
+                result = self.cli('--worker-route', route)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('Unsupported worker route', result.stderr)
+                self.assertFalse((self.home / '.agents').exists())
+
+    def test_non_flash_root_is_preserved_when_the_worker_route_differs(self):
+        # The operator's real configuration can root on another reviewed route.
+        self.config.write_text(self.config.read_text().replace('fixture-astra-root', 'grok-oauth/grok-4.6'))
+        self.set_catalog_route('deepseek/deepseek-v4-pro')
+        original = self.config.read_bytes()
+        result = self.cli('--worker-route', 'deepseek/deepseek-v4-pro', '--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.config.read_bytes(), original)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], 'deepseek/deepseek-v4-pro')
+
+    def test_root_equal_to_the_selected_worker_route_warns_and_installs(self):
+        # One model may legally serve both roles, and the saved default is not
+        # proof of the model a running session uses. Warn; never rewrite the root.
+        route = 'grok-oauth/grok-4.6'
+        self.config.write_text(self.config.read_text().replace('fixture-astra-root', route))
+        self.set_catalog_route(route)
+        original = self.config.read_bytes()
+        report, _ = inspect(self.home, self.codex, worker_route=route)
+        self.assertEqual(report['root_model_observed'], route)
+        self.assertTrue(any('also the selected worker route' in w for w in report['warnings']))
+        result = self.cli('--worker-route', route, '--apply')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('also the selected worker route', result.stdout)
+        self.assertEqual(self.config.read_bytes(), original)
+        role = tomllib.loads((self.codex / 'agents' / f'{ROLE}.toml').read_text())
+        self.assertEqual(role['model'], route)
+
+    def test_local_cloud_aliases_are_refused_as_local_routes(self):
+        # Ollama serves these alias variants from its cloud: `:cloud` and
+        # `:<size>b-cloud` carry no weights on this machine, so a local/ slug
+        # must not be able to mislabel them as local inference.
+        for route, variant in {'local/model:cloud': 'cloud',
+                               'local/model:123b-cloud': '123b-cloud',
+                               'local/gemma4:cloud': 'cloud',
+                               'local/qwen3.5:397b-cloud': '397b-cloud',
+                               'local/nemotron-3-super:cloud': 'cloud'}.items():
+            with self.subTest(route=route):
+                self.assertEqual(local_route_cloud_variant(route), variant)
+                with self.assertRaisesRegex(SetupError, 'cloud alias'):
+                    require_route(route)
+                self.assertIsNone(route_provider(route))
+                self.assertIsNone(route_family(route))
+
+    def test_local_cloud_alias_is_refused_before_any_write(self):
+        self.set_catalog_route('local/model:cloud')
+        result = self.cli('--worker-route', 'local/model:cloud', '--apply')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('cloud alias', result.stderr)
+        self.assertIn('ollama-cloud provider route', result.stderr)
+        self.assertFalse((self.home / '.agents').exists())
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_local_routes_that_only_look_like_cloud_aliases_are_allowed(self):
+        for route in ('local/cloud', 'local/model-cloud', 'local/cloudy:12b', 'local/model:cloudy'):
+            with self.subTest(route=route):
+                self.assertIsNone(local_route_cloud_variant(route))
+                self.assertEqual(require_route(route), route)
+                self.assertEqual(route_family(route), 'local')
+
+    def test_effort_that_the_route_does_not_support_is_refused(self):
+        self.catalog.write_text(json.dumps({'models': [{
+            'slug': ROUTE, 'multi_agent_version': 'v2', 'default_reasoning_level': 'xhigh',
+            'supported_reasoning_levels': [{'effort': 'low'}, {'effort': 'high'}]
+        }]}))
+        with self.assertRaisesRegex(SetupError, 'not listed in the supported efforts'):
+            self.report()
+
+    def test_duplicate_catalog_route_is_refused(self):
+        payload = json.loads(self.catalog.read_text())
+        payload['models'].append(dict(payload['models'][0]))
+        self.catalog.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(SetupError, 'missing or duplicated'):
+            self.report()
 
     def test_existing_alternate_binding_is_reused_on_update(self):
         route = 'openrouter/deepseek-v4.1-flash'
@@ -478,6 +664,30 @@ class PolicyTests(unittest.TestCase):
             binding.write_text(json.dumps({'worker_model': 'custom/deepseek-v4.1-flash'}))
             with self.assertRaisesRegex(SetupError, 'Unsupported worker route'):
                 resolve_worker_route(binding=binding)
+
+    def test_worker_route_resolution_reuses_a_local_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binding = Path(directory).resolve() / 'routing.json'
+            binding.write_text(json.dumps({'worker_model': 'local/qwen3.8:27b-mlx'}))
+            self.assertEqual(resolve_worker_route(binding=binding), 'local/qwen3.8:27b-mlx')
+            with self.assertRaisesRegex(SetupError, 'Unsupported worker route'):
+                resolve_worker_route('local//broken', binding)
+
+    def test_require_route_returns_the_route_or_refuses_it(self):
+        for route in ('deepseek/deepseek-v4-pro', 'grok-oauth/grok-4.6', 'grok-oauth/grok-4.5',
+                      'openrouter/claude-fable-5.1', 'local/gemma4:12b'):
+            with self.subTest(route=route):
+                self.assertEqual(require_route(route), route)
+        for bad in (None, 7, 'lmstudio/local-model', 'ollama/deepseek-v4.1-flash', 'local/'):
+            with self.subTest(route=bad):
+                with self.assertRaisesRegex(SetupError, 'Unsupported worker route'):
+                    require_route(bad)
+
+    def test_route_hint_names_every_reviewed_route(self):
+        hint = route_hint()
+        for route in SUPPORTED_ROUTES:
+            self.assertIn(route, hint)
+        self.assertIn('local/<ollama-tag>', hint)
 
     def test_worker_route_resolution_refuses_symlinked_binding(self):
         with tempfile.TemporaryDirectory() as directory:

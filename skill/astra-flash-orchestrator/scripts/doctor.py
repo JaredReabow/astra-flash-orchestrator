@@ -8,7 +8,23 @@ import sys
 import urllib.error
 import urllib.request
 sys.dont_write_bytecode = True
-from local_config import SetupError, default_locations, inspect, model_entries, model_id, resolve_worker_route, SUPPORTED_ROUTES
+from local_config import (
+    DEFAULT_ROUTE, SetupError, default_locations, inspect, model_entries, model_id,
+    require_route, resolve_worker_route,
+)
+
+
+def route_argument(value: str) -> str:
+    """Validate --worker-route as an argparse value before any inspection.
+
+    The installer keeps its own copy of this adapter on purpose: this file is
+    also installed as a standalone skill script and must not import the
+    repository-root installer.
+    """
+    try:
+        return require_route(value)
+    except SetupError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -27,7 +43,7 @@ def check_local_catalog(url: str, worker_route: str) -> None:
             raise SetupError("Local model response exceeded its size limit.")
         entries = model_entries(json.loads(body))
         if not any(model_id(entry) == worker_route for entry in entries):
-            raise SetupError("The live local catalog does not advertise the requested Flash route.")
+            raise SetupError("The live local catalog does not advertise the requested worker route.")
     except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeError) as exc:
         raise SetupError(f"Local catalog check failed ({type(exc).__name__}); private URL withheld.") from None
 
@@ -39,8 +55,12 @@ def main() -> int:
     parser.add_argument("--profile")
     parser.add_argument(
         "--worker-route",
-        choices=SUPPORTED_ROUTES,
-        help="check a reviewed route (default: installed routing binding, then direct DeepSeek API)",
+        type=route_argument,
+        metavar="ROUTE",
+        help=(
+            "check a reviewed worker route, including a configured local/<ollama-tag> route "
+            f"(default: installed routing binding, then {DEFAULT_ROUTE})"
+        ),
     )
     parser.add_argument(
         "--check-local-router",

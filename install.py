@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preview/install the Astra + Flash skill without changing Codex model/provider settings."""
+"""Preview/install the Astra-led worker skill without changing Codex model/provider settings."""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -18,10 +18,21 @@ sys.dont_write_bytecode = True
 BUNDLE = Path(__file__).resolve().parent
 SKILL_SOURCE = BUNDLE / "skill" / "astra-flash-orchestrator"
 sys.path.insert(0, str(SKILL_SOURCE / "scripts"))
-from local_config import SetupError, default_locations, inspect, resolve_worker_route, ROLE, SKILL, SUPPORTED_ROUTES
+from local_config import (
+    DEFAULT_ROUTE, ROLE, SKILL, SetupError, default_locations, inspect, require_route,
+    resolve_worker_route,
+)
 
 BEGIN = b"<!-- BEGIN astra-flash-orchestrator managed policy -->"
 END = b"<!-- END astra-flash-orchestrator managed policy -->"
+
+
+def route_argument(value: str) -> str:
+    """Validate --worker-route as an argparse value instead of at first write."""
+    try:
+        return require_route(value)
+    except SetupError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
 
 
 def digest(data: bytes | None) -> str | None:
@@ -93,14 +104,15 @@ def plan_changes(home: Path, codex_home: Path, report: dict, with_policy: bool, 
             requested[target / source.relative_to(SKILL_SOURCE)] = source.read_bytes()
     routing = {
         key: report[key]
-        for key in ("worker_model", "worker_provider", "worker_effort", "custom_agent", "profile_inspected")
+        for key in ("worker_model", "worker_provider", "worker_route_family", "worker_effort",
+                    "custom_agent", "profile_inspected")
     }
     requested[target / "routing.json"] = (json.dumps(routing, indent=2) + "\n").encode()
     instructions = (BUNDLE / "WORKER-INSTRUCTIONS.md").read_text(encoding="utf-8").strip()
     # JSON basic strings are valid TOML basic strings for these generated values.
     role = (
         f'name = {json.dumps(ROLE)}\n'
-        'description = "Implement an Astra-approved task bundle using the installed Flash route; never orchestrate or self-approve."\n'
+        'description = "Implement an orchestrator-approved task bundle using the installed worker route; never orchestrate or self-approve."\n'
         f'model = {json.dumps(report["worker_model"])}\n'
     )
     if report["worker_effort"]:
@@ -227,8 +239,12 @@ def main() -> int:
     parser.add_argument("--profile", help="inspect a specific existing profile; does not change profile selection")
     parser.add_argument(
         "--worker-route",
-        choices=SUPPORTED_ROUTES,
-        help="pin one reviewed DeepSeek V4.1 Flash provider route (default: existing binding, then direct DeepSeek API)",
+        type=route_argument,
+        metavar="ROUTE",
+        help=(
+            "pin one reviewed worker route, including a configured local/<ollama-tag> route "
+            f"(default: existing routing binding, then {DEFAULT_ROUTE})"
+        ),
     )
     parser.add_argument("--undo", type=Path, metavar="RECEIPT", help="preview restoration from an installation receipt; combine with --apply to restore")
     args = parser.parse_args()

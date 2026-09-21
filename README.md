@@ -8,10 +8,13 @@ A personal Codex skill designed to preserve Astra usage without giving up Astra'
 judgment. Astra stays responsible for planning, architecture, high-stakes
 decisions and final review. DeepSeek V4.1 Flash takes the high-volume work:
 repository discovery, implementation, testing, debugging and routine verification.
+Flash is the default worker, and an operator can pin one other already-configured
+reviewed route instead when a task needs it.
 
 Bring an existing plan or start with a feature request. The workflow turns it
-into coherent implementation bundles, sends those bundles to Flash, then returns
-the completed patch and evidence to Astra for one focused acceptance pass.
+into coherent implementation bundles, sends those bundles to the installed worker
+route, then returns the completed patch and evidence to Astra for one focused
+acceptance pass.
 
 > **Status:** early release. Offline installation tests pass, and the workflow has completed a measured local field build. Results below describe that run, not guaranteed savings. A new installation still needs runtime routing verification on its first authorized task. Installation never runs paid inference.
 
@@ -55,8 +58,9 @@ Astra  →  review + verify + accept or request fixes
 - **Coherent assignments:** one feature slice can include many edit/test/fix steps.
 - **Focused Astra root:** normally one planning batch, one dispatch, one wait, one
   batched acceptance review and one final response.
-- **Worker-owned execution:** Flash handles in-scope discovery, implementation,
-  testing, debugging and routine browser/visual QA without progress polling.
+- **Worker-owned execution:** the installed worker route handles in-scope
+  discovery, implementation, testing, debugging and routine browser/visual QA
+  without progress polling.
 - **Review before acceptance:** the builder submits evidence; Astra decides whether it is complete.
 - **Existing plans welcome:** works with repository plans, Superpowers/GSD artifacts, or the included templates.
 - **Controlled parallel work:** one writer by default; two only with independent tasks and verified separate workspaces.
@@ -67,11 +71,12 @@ This is workflow guidance, not a deterministic scheduler, a security sandbox, or
 ### One orchestration workflow
 
 There is no mode setting or mode-switch command. The package always uses the
-usage-saving Astra → Flash → Astra workflow for substantial implementation.
+usage-saving Astra → worker → Astra workflow for substantial implementation.
 
 Three routing outcomes remain intentionally different:
 
-- Substantial implementation uses Astra to plan and review while Flash builds.
+- Substantial implementation uses Astra to plan and review while the installed
+  worker builds; DeepSeek V4.1 Flash is the default worker route.
 - Trivial work and explicit single-agent requests stay with the root session.
 - Concrete security, architecture, payments, tenancy, secrets, migration or
   production risk can justify targeted additional Astra review.
@@ -83,9 +88,9 @@ Those are scope and safety decisions, not user-selectable performance modes.
 Before installing, you need:
 
 1. A Codex client that supports native subagents and standalone custom agent TOML files under `$CODEX_HOME/agents/`.
-2. GPT-6 Astra selected as the root model.
+2. GPT-6 Astra selected as the root model. The installer refuses a root that is one of the DeepSeek V4.1 Flash routes and never changes the root itself; another root model is accepted as-is.
 3. Python **3.11 or newer**. No third-party Python dependencies are needed.
-4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for one reviewed DeepSeek V4.1 Flash route below.
+4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for the worker route you intend to pin (DeepSeek V4.1 Flash by default; see the route tables below).
 5. A local Codex model catalog advertising that exact route with `multi_agent_version: "v2"`.
 
 | Provider | Worker route |
@@ -96,6 +101,32 @@ Before installing, you need:
 | Command Code | `commandcode/deepseek-v4.1-flash` |
 | Nous Research | `nousresearch/deepseek-v4.1-flash` |
 | Ollama Cloud | `ollama-cloud/deepseek-v4.1-flash` |
+
+### Other reviewed worker routes
+
+These routes are accepted by the same `--worker-route` option and are subject to
+the same fail-closed checks. Nothing here is selected automatically.
+
+| Provider | Worker route | Prerequisite |
+| --- | --- | --- |
+| DeepSeek API | `deepseek/deepseek-v4-pro` | advertised as `v2` |
+| xAI Grok OAuth | `grok-oauth/grok-4.6` | advertised as `v2` |
+| xAI Grok OAuth | `grok-oauth/grok-4.5` | currently published as `v1`; enable that exact route first |
+| OpenRouter | `openrouter/claude-fable-5.1` | advertised as `v2` |
+| Local Ollama | `local/<ollama-tag>`, e.g. `local/qwen3.8:27b-mlx` | that exact model enabled in the Router and advertised as `v2` |
+
+The installer reads the catalog your session actually uses, so it rejects a route
+that is missing, duplicated, or still published as `v1`. Ollama cloud aliases
+(`<model>:cloud` and `<model>:<size>b-cloud`) are refused under `local/`, because
+those are served from Ollama's cloud. A `local/` slug only records which namespace
+the Router published; it is not evidence that inference runs on your machine. Use
+the Router's `ollama-cloud` provider route for those models.
+
+The role name stays `astra_flash_builder` in every case for install and update
+compatibility; its model field is the route you pinned. If the root model and the
+worker route are the same, installation continues and warns, because one model can
+serve both roles while keeping their responsibilities separate. The root model, root effort,
+provider URLs and credentials are never rewritten.
 
 Provider credentials are entered by you through Codex Router's private local
 prompt before installing this package. Never paste an API key into an assistant
@@ -111,20 +142,24 @@ Do **not** add or change `[agents].default_subagent_model` for this package. The
 installer creates a named `astra_flash_builder` role that pins its own route and
 catalog-supported effort, so unrelated subagents keep their existing defaults.
 The installer **does not install the Router, add credentials, select your root
-model, or rewrite `config.toml`**. Direct DeepSeek remains the default. Any other
-provider requires an explicit `--worker-route`; if that route is unavailable,
-installation stops instead of silently choosing another provider.
+model, enable a provider, or rewrite `config.toml`**. Direct DeepSeek V4.1 Flash
+remains the default. Any other route requires an explicit `--worker-route`; if
+that route is unavailable, installation stops instead of silently choosing
+another provider.
 
 The installer supports loopback Router URLs using `/v1` or `/_codex-router/<capability>/v1`. It rejects remote hosts, embedded credentials, queries, fragments and unexpected paths. Client/project/UI overrides still need checking in your actual session. Router subagent selection enables discovery; it does not prove successful inference. Some Router enable commands automatically launch paid verification, so inspect the installed version before changing selection. This installer never enables routes or runs those probes.
 
 ## Install
 
-Download this repository as a ZIP and extract it, or clone it:
+Download this repository as a ZIP and extract it, or clone the maintained fork:
 
 ```sh
-git clone https://github.com/ethanplusai/astra-flash-orchestrator.git
+git clone https://github.com/JaredReabow/astra-flash-orchestrator.git
 cd astra-flash-orchestrator
 ```
+
+This fork tracks upstream [ethanplusai/astra-flash-orchestrator](https://github.com/ethanplusai/astra-flash-orchestrator)
+and keeps its attribution and license.
 
 Run the following commands from that repository folder.
 
@@ -143,16 +178,21 @@ second repeats preflight, installs atomically, backs up existing instructions an
 prints a guarded undo receipt. It does not change your root model, Router,
 credentials, permissions or reasoning effort.
 
-To use an already-configured alternate provider, pass its exact route to both
-commands. For OpenRouter:
+To use an already-configured alternate route, pass its exact slug to both
+commands. For OpenRouter, a Grok OAuth route, or a local Ollama model:
 
 ```sh
 python3 -B install.py --worker-route openrouter/deepseek-v4.1-flash
 python3 -B install.py --worker-route openrouter/deepseek-v4.1-flash --apply
+python3 -B install.py --worker-route grok-oauth/grok-4.6
+python3 -B install.py --worker-route grok-oauth/grok-4.6 --apply
+python3 -B install.py --worker-route local/qwen3.8:27b-mlx
+python3 -B install.py --worker-route local/qwen3.8:27b-mlx --apply
 ```
 
 The option selects an existing catalog route; it does not configure the provider,
-collect a key, certify the model or make an inference request.
+collect a key, enable a model, certify the route or make an inference request. An
+unknown or malformed route is refused before any file is written.
 
 ### With Codex
 
@@ -180,7 +220,7 @@ For a nondefault profile, pass `--profile PROFILE` to the dry run, apply and doc
 | Location | Installed content |
 | --- | --- |
 | `~/.agents/skills/astra-flash-orchestrator/` | Skill, references, templates, doctor, plan validator and routing binding |
-| `$CODEX_HOME/agents/astra_flash_builder.toml` | Native builder pinned to Flash; nested agents disabled |
+| `$CODEX_HOME/agents/astra_flash_builder.toml` | Native builder pinned to the installed worker route; nested agents disabled |
 | `$CODEX_HOME/AGENTS.md` | A marked, scoped workflow policy block |
 | `$CODEX_HOME/astra-flash-install-backups/` | Original files and an undo receipt |
 
@@ -195,13 +235,13 @@ Root model/effort, provider configuration, authentication and existing permissio
 ```text
 $astra-flash-orchestrator Use the existing plan in docs/plan.md to implement
 this feature. Keep Astra focused on planning and final review. Use one installed
-Flash builder for a coherent implementation and verification bundle. Do not poll
-the worker; review its completed patch and evidence in one batched pass.
+worker for a coherent implementation and verification bundle. Do not poll the
+worker; review its completed patch and evidence in one batched pass.
 ```
 
 Replace the example plan path with your actual plan or describe the feature. Your first authorized useful task should verify the child model and provider using host/router request metadata. A worker saying its model name is not proof.
 
-If the session does not expose the custom role or exact worker model, do not substitute another model or launch a second CLI. Check client support and session configuration first.
+If the session does not expose the custom role or exact worker model, do not substitute another model or launch a second CLI. Check client support and session configuration first. To change worker route later, re-run the installer with the new `--worker-route` and review the replacement before applying it.
 
 ## Check your setup
 
@@ -239,6 +279,7 @@ Add `--apply` to restore. Undo refuses if a managed file changed afterward, prot
 - [Sources](SOURCES.md): provenance and upstream references.
 - [Release preparation](docs/RELEASE.md): GitHub description, topics and release checks.
 - [Changelog](CHANGELOG.md): changes from the original package.
+- [History](HISTORY.md): append-only, dated record of every change.
 
 To validate the synthetic plan example:
 

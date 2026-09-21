@@ -13,11 +13,39 @@ installed `routing.json` records the exact selected route and provider. Do not
 substitute an upstream vendor name in the role's model field. See `sources.md`
 for the public references.
 
+## Reviewed worker routes
+
+DeepSeek V4.1 Flash is the default and the only route family this package
+recommends for high-volume work. An operator may instead pin one of these
+already-configured routes explicitly:
+
+| Route | Provider |
+| --- | --- |
+| `deepseek/deepseek-v4.1-flash` (default) | DeepSeek API |
+| `openrouter/deepseek-v4.1-flash` | OpenRouter |
+| `opencode-go/deepseek-v4.1-flash` | opencode Go |
+| `commandcode/deepseek-v4.1-flash` | Command Code |
+| `nousresearch/deepseek-v4.1-flash` | Nous Research |
+| `ollama-cloud/deepseek-v4.1-flash` | Ollama Cloud |
+| `deepseek/deepseek-v4-pro` | DeepSeek API |
+| `grok-oauth/grok-4.6` | xAI Grok OAuth |
+| `grok-oauth/grok-4.5` | xAI Grok OAuth |
+| `openrouter/claude-fable-5.1` | OpenRouter |
+| `local/<ollama-tag>` | Local (Ollama), dynamic |
+
+The role name stays `astra_flash_builder` even when another route is pinned, so a
+new session can reuse an existing installation. Read `routing.json` for the actual
+model rather than assuming Flash. Two routes are easy to misread:
+`grok-oauth/grok-4.5` is currently published as `v1`, and local Ollama models are
+published as `v1` by design, so both stay blocked until the operator enables that
+exact route in the Router. Do not work around that in this package.
+
 ## Installation bindings
 
 The installer uses direct DeepSeek by default or the reviewed route explicitly
-passed with `--worker-route`, then verifies that exact entry exists in the local
-model catalog with `multi_agent_version: "v2"`. It never auto-selects a provider.
+passed with `--worker-route`, then verifies that exact entry exists exactly once in
+the local model catalog with `multi_agent_version: "v2"`. It never auto-selects,
+enables or probes a provider.
 On later updates and doctor runs, a valid installed `routing.json` preserves that
 choice when the option is omitted. It writes a standalone personal agent with the
 name `astra_flash_builder` and pins both its route and the catalog's supported
@@ -29,6 +57,14 @@ and config.toml untouched. Provider keys are entered by the user through the
 Router's private local prompt, never through assistant chat.
 The child inherits sandbox/approval settings; its `[agents].enabled = false`
 prevents recursive subagent tools under the documented custom-agent format.
+
+The installer also refuses a root model that is a Flash route, because this
+workflow's premise is a non-Flash orchestrator delegating volume to a cheaper
+worker. That is the only forbidden root: a root model equal to the selected worker
+route is allowed and reported as a warning, since one model can serve both roles
+and a saved default is not proof of what a running session uses. Nothing here
+rewrites the root; every other root model, root effort, provider URL and credential
+is left untouched.
 
 The public docs describe custom-agent files under `$CODEX_HOME/agents/`. A named
 role can pin its own model and effort independently of global child defaults.
@@ -50,8 +86,8 @@ on guesswork, silently upgrade software, or fall back to an expensive agent.
 
 For the first real delegated task, verify all of the following:
 
-- Root thread still shows Astra; child thread/session metadata shows the exact
-  Flash route or an equivalent documented provider mapping.
+- Root thread still shows the orchestrator; child thread/session metadata shows the
+  exact pinned worker route or an equivalent documented provider mapping.
 - Router request/usage metadata confirms the selected provider and upstream model
   for that child request. Do not paste private caller URLs, tokens, or raw logs.
 - The child actually executes a small useful task, changes only its scope, and

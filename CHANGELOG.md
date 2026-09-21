@@ -1,7 +1,41 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 — Multi-model worker routes
 
+- Accept an explicit, reviewed worker route beyond the DeepSeek V4.1 Flash family:
+  `deepseek/deepseek-v4-pro`, `grok-oauth/grok-4.6`, `grok-oauth/grok-4.5` and
+  `openrouter/claude-fable-5.1`, plus a dynamic `local/<ollama-tag>` Ollama route
+  validated against the Router's own tag grammar. Flash stays the default and the
+  `astra_flash_builder` role name is retained for install and update compatibility.
+- Keep the fail-closed route contract for every route: the exact slug must appear
+  once in the catalog the session actually uses and advertise
+  `multi_agent_version: "v2"`, and an unknown, malformed, duplicated or `v1` route
+  stops installation without substituting a provider. `grok-oauth/grok-4.5` is
+  listed as `v1` in the published catalog, and no `local/*` entry is present at
+  all, so both stay blocked until the operator enables that exact route in the
+  Router.
+- Refuse Ollama cloud alias variants (`<model>:cloud` and `<model>:<size>b-cloud`)
+  under the `local/` prefix with their own message. They are served from Ollama's
+  cloud, and a slug prefix is not evidence of where inference runs. Use the
+  Router's `ollama-cloud` provider route for those models.
+- Keep the 1.2.0 Flash-root refusal, and report a root model equal to the selected
+  worker route as a warning instead of an error: one model may serve both roles,
+  and the saved default is not proof of the model a running session uses. Every
+  root value, root effort, provider URL and credential is preserved untouched.
+- Record the route family (`flash`, `cloud`, `local`) in the report and the
+  installed routing binding, and keep validating the pinned effort against the
+  route's advertised reasoning levels.
+- Generalize Flash-only wording in the managed policy, skill, references, README,
+  install prompt and troubleshooting to describe the installed worker route
+  instead of assuming one provider.
+- Add offline coverage for each new route, the binding round trip, dynamic local
+  routes, cloud-alias refusal, malformed and unknown slugs, the `v1` rejection,
+  the same-model root warning and the existing regression suite.
+- Add an append-only `HISTORY.md` alongside `CHANGELOG.md` and include both in the
+  release inventory; the two files are not substitutes for each other.
+- Point the README clone/download instructions at this fork while keeping upstream
+  attribution, and drop machine-specific paths and private root-configuration
+  details from the published documents.
 - Support explicit, reviewed DeepSeek V4.1 Flash routes through OpenRouter,
   opencode Go, Command Code, Nous Research and Ollama Cloud while retaining the
   direct DeepSeek API as the default. Existing alternate-route installations

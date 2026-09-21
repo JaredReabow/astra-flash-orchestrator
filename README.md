@@ -88,7 +88,7 @@ Those are scope and safety decisions, not user-selectable performance modes.
 Before installing, you need:
 
 1. A Codex client that supports native subagents and standalone custom agent TOML files under `$CODEX_HOME/agents/`.
-2. GPT-6 Astra selected as the root model. The installer refuses a root that is one of the DeepSeek V4.1 Flash routes and never changes the root itself; another root model is accepted as-is.
+2. GPT-6 Astra selected as the root model, or another orchestrator you run at the root (for example GPT-5.6 Terra). The installer refuses a root that is one of the DeepSeek V4.1 Flash routes and never changes the root itself; any other root model is accepted as-is.
 3. Python **3.11 or newer**. No third-party Python dependencies are needed.
 4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for the worker route you intend to pin (DeepSeek V4.1 Flash by default; see the route tables below).
 5. A local Codex model catalog advertising that exact route with `multi_agent_version: "v2"`.
@@ -127,6 +127,49 @@ compatibility; its model field is the route you pinned. If the root model and th
 worker route are the same, installation continues and warns, because one model can
 serve both roles while keeping their responsibilities separate. The root model, root effort,
 provider URLs and credentials are never rewritten.
+
+### Named builders: several pinned roles at once
+
+A root session running Astra or Terra can keep several builders installed at the
+same time and name the one it wants for a task. Each `--builder` install writes
+only that role's agent file and its own binding, so installing or updating one
+role never changes another:
+
+| `--builder` | Native role | Label | Pinned route |
+| --- | --- | --- | --- |
+| `grok` | `astra_terra_builder_grok` | Astra/Terra builder Grok | `grok-oauth/grok-4.6` (override: `grok-oauth/grok-4.5`) |
+| `fable` | `astra_terra_builder_fable` | Astra/Terra builder Fable | `openrouter/claude-fable-5.1` |
+| `deepseek-flash` | `astra_terra_builder_deepseek_flash` | Astra/Terra builder DeepSeek Flash | `deepseek/deepseek-v4.1-flash` |
+| `deepseek-pro` | `astra_terra_builder_deepseek_pro` | Astra/Terra builder DeepSeek Pro | `deepseek/deepseek-v4-pro` |
+| `grok-4-5` | `astra_terra_builder_grok_4_5` | Astra/Terra builder Grok 4.5 | `grok-oauth/grok-4.5` |
+| `ollama` | `astra_terra_builder_ollama` | Astra/Terra builder Ollama (local) | `local/<ollama-tag>`, named on the first install |
+
+```sh
+python3 -B install.py --builder grok --replace
+python3 -B install.py --builder grok --replace --apply
+python3 -B install.py --builder fable --replace --apply
+python3 -B install.py --builder deepseek-flash --replace --apply
+```
+
+`--worker-route` refines a preset only inside it: `grok` accepts 4.6 or 4.5;
+`fable`, `deepseek-flash`, `deepseek-pro` and `grok-4-5` accept their exact route;
+`ollama` requires a configured `local/<ollama-tag>` the first time. A route from
+another preset is refused before any file is written.
+
+Bindings live beside the installed skill as `builders/<role>.json`, one per role
+and separate from the legacy `routing.json`. Check one role at any time:
+
+```sh
+python3 -B skill/astra-flash-orchestrator/scripts/doctor.py --builder grok
+```
+
+Running the installer without `--builder` still installs or updates the legacy
+`astra_flash_builder` worker and its `routing.json`; that path is untouched by
+named builders, and named bindings are untouched by it. Undo restores exactly the
+role named in the receipt and refuses unknown role or binding paths. The first
+install owns the shared skill files and the managed policy, so undo in reverse
+install order: a receipt that owns those shared files is refused while another
+builder is still installed, because that builder would be left without the skill.
 
 Provider credentials are entered by you through Codex Router's private local
 prompt before installing this package. Never paste an API key into an assistant

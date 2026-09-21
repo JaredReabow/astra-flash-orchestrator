@@ -40,6 +40,26 @@ model rather than assuming Flash. Two routes are easy to misread:
 published as `v1` by design, so both stay blocked until the operator enables that
 exact route in the Router. Do not work around that in this package.
 
+## Named builders
+
+Several builders can be installed at once. Each one has a stable native role id and
+its own binding file, so a root session (Astra or Terra) can name the builder it
+wants per task:
+
+| `--builder` | Native role | Label | Routes that role may pin |
+| --- | --- | --- | --- |
+| `grok` | `astra_terra_builder_grok` | Astra/Terra builder Grok | `grok-oauth/grok-4.6` (default), `grok-oauth/grok-4.5` |
+| `fable` | `astra_terra_builder_fable` | Astra/Terra builder Fable | `openrouter/claude-fable-5.1` |
+| `deepseek-flash` | `astra_terra_builder_deepseek_flash` | Astra/Terra builder DeepSeek Flash | `deepseek/deepseek-v4.1-flash` |
+| `deepseek-pro` | `astra_terra_builder_deepseek_pro` | Astra/Terra builder DeepSeek Pro | `deepseek/deepseek-v4-pro` |
+| `grok-4-5` | `astra_terra_builder_grok_4_5` | Astra/Terra builder Grok 4.5 | `grok-oauth/grok-4.5` |
+| `ollama` | `astra_terra_builder_ollama` | Astra/Terra builder Ollama (local) | `local/<ollama-tag>`, named on the first install |
+
+Role ids contain no slash or space. Installing one builder writes that role's agent
+file and `builders/<role>.json` only; it never rewrites the legacy `routing.json`
+or another builder's binding. Undo restores only the roles and bindings named in
+the receipt and refuses any unknown role or binding path.
+
 ## Installation bindings
 
 The installer uses direct DeepSeek by default or the reviewed route explicitly
@@ -58,6 +78,12 @@ Router's private local prompt, never through assistant chat.
 The child inherits sandbox/approval settings; its `[agents].enabled = false`
 prevents recursive subagent tools under the documented custom-agent format.
 
+With `--builder`, the same checks run for that preset's own route and the resolved
+route is recorded in `builders/<role>.json`. `--worker-route` may only refine the
+preset it is paired with. Read the binding for the role you dispatched to instead
+of assuming a provider; installed roles are alternatives, not a pool to launch
+together.
+
 The installer also refuses a root model that is a Flash route, because this
 workflow's premise is a non-Flash orchestrator delegating volume to a cheaper
 worker. That is the only forbidden root: a root model equal to the selected worker
@@ -69,7 +95,7 @@ is left untouched.
 The public docs describe custom-agent files under `$CODEX_HOME/agents/`. A named
 role can pin its own model and effort independently of global child defaults.
 Choosing a different existing custom role may therefore change the model. In
-particular, keep final review in the root Astra thread.
+particular, keep final review in the root orchestrator thread.
 
 ## Runtime check
 

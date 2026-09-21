@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.4.0 — Named builders
+
+- Add `install.py --builder <preset>` for six separately pinned builder roles that
+  coexist on one machine: `grok` (`astra_terra_builder_grok`), `fable`
+  (`astra_terra_builder_fable`), `deepseek-flash`
+  (`astra_terra_builder_deepseek_flash`), `deepseek-pro`
+  (`astra_terra_builder_deepseek_pro`), `grok-4-5`
+  (`astra_terra_builder_grok_4_5`) and `ollama`
+  (`astra_terra_builder_ollama`). Grok defaults to the 4.6 OAuth route, Fable is
+  OpenRouter, Flash and Pro are the direct DeepSeek routes, Grok 4.5 is the exact
+  OAuth route, and Ollama is local-only. Role ids are human-readable labels with no
+  slash or space, and each role description carries the requested label.
+- Bind each role to its own `builders/<role>.json` under the installed skill, in a
+  new centralized preset module. Installing or updating one builder writes only
+  that role's agent file and binding: it never rewrites the legacy `routing.json`,
+  the legacy `astra_flash_builder` role, or another builder. The legacy CLI path,
+  role name, `routing.json` binding location, pinning rules and undo semantics are
+  unchanged; its generated role file still carries the current
+  `WORKER-INSTRUCTIONS.md` text, so editing those instructions changes that file.
+- Restrict `--worker-route` to routes the paired preset may pin: Grok accepts 4.6
+  or 4.5, Fable, DeepSeek Flash, DeepSeek Pro and Grok 4.5 accept their exact
+  route, and Ollama requires a configured `local/<ollama-tag>` on the first
+  install, then reuses its binding. A mismatch is refused before any write.
+- Add `doctor.py --builder <preset>`, which reads that role's own binding, and keep
+  the default doctor path on the legacy binding.
+- Extend undo with an allowlist on top of the existing receipt checks: only known
+  roles (`agents/<role>.toml`) and known bindings (`builders/<role>.json`) may be
+  restored, so a tampered receipt cannot add a role or binding the package never
+  installs.
+- Fail undo closed when the receipt owns the shared skill files or the managed
+  policy and another installed role or binding would be left behind, with
+  reverse-install-order guidance. Role-only receipts stay allowed, so undoing a
+  later builder is never blocked by an earlier one. The legacy role and its
+  `routing.json` are covered by the same guard.
+- Filter generated binding files out of the bundled skill copy. A stray
+  `routing.json` or `builders/*.json` in a checkout can no longer be published
+  over the installed legacy binding or another role's pinned route.
+- Generalize the managed policy, skill and references for a root session running
+  Astra or Terra: keep the operator's chosen orchestrator, dispatch to one
+  explicitly named installed builder, and never start several writers because
+  several roles happen to be installed.
+- Add a reference example under `examples/named-builders/` plus offline coverage for
+  coexistence, per-role isolation, doctor selection, undo order, cloud/`v1`/absent
+  route refusal, preset/route mismatches and undo path allowlisting.
+
 ## 1.3.0 — Multi-model worker routes
 
 - Accept an explicit, reviewed worker route beyond the DeepSeek V4.1 Flash family:

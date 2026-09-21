@@ -22,9 +22,27 @@ from local_config import (
     DEFAULT_ROUTE, ROLE, SKILL, SetupError, default_locations, inspect, require_route,
     resolve_worker_route,
 )
+import builders
 
 BEGIN = b"<!-- BEGIN astra-flash-orchestrator managed policy -->"
 END = b"<!-- END astra-flash-orchestrator managed policy -->"
+
+# The legacy unnamed worker keeps its own role name, binding path and pinning
+# semantics. Its embedded developer instructions track WORKER-INSTRUCTIONS.md, so
+# a release that edits those instructions changes this role file on purpose.
+LEGACY_ROLE_DESCRIPTION = (
+    "Implement an orchestrator-approved task bundle using the installed worker route; "
+    "never orchestrate or self-approve."
+)
+LEGACY_BINDING_KEYS = (
+    "worker_model", "worker_provider", "worker_route_family", "worker_effort",
+    "custom_agent", "profile_inspected",
+)
+
+# Generated at install time, never copied from the bundle: a stray binding in a
+# checkout must not be able to overwrite the installed legacy binding or another
+# role's pinned route. This mirrors the release inventory's own exclusions.
+GENERATED_SKILL_FILES = frozenset({"routing.json", "receipt.json", "auth.json"})
 
 
 def route_argument(value: str) -> str:
@@ -86,9 +104,18 @@ def atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
             os.unlink(name)
 
 
-def plan_changes(home: Path, codex_home: Path, report: dict, with_policy: bool, replace: bool) -> list[dict]:
+def plan_changes(
+    home: Path,
+    codex_home: Path,
+    report: dict,
+    with_policy: bool,
+    replace: bool,
+    builder: builders.BuilderPreset | None = None,
+) -> list[dict]:
+    """Plan the reviewed writes for the legacy worker or one named builder."""
     target = home / ".agents" / "skills" / SKILL
-    role_path = codex_home / "agents" / f"{ROLE}.toml"
+    role_id = builder.role if builder else ROLE
+    role_path = codex_home / "agents" / f"{role_id}.toml"
     no_symlinks(target)
     # Detect a second copy instead of silently creating duplicate skill activations.
     legacy = codex_home / "skills" / SKILL
@@ -98,21 +125,33 @@ def plan_changes(home: Path, codex_home: Path, report: dict, with_policy: bool, 
     for source in sorted(SKILL_SOURCE.rglob("*")):
         if source.is_symlink():
             raise SetupError("The bundle contains an unexpected symlink.")
+        relative = source.relative_to(SKILL_SOURCE)
+        if relative.parts and relative.parts[0] == builders.BUILDERS_DIRNAME:
+            # Per-role bindings are written from the report for one role only.
+            continue
+        if relative.name in GENERATED_SKILL_FILES:
+            continue
         if (source.is_file() and "__pycache__" not in source.parts
                 and source.suffix not in {".pyc", ".pyo", ".bak"}
                 and ".before-" not in source.name and source.name != ".DS_Store"):
-            requested[target / source.relative_to(SKILL_SOURCE)] = source.read_bytes()
-    routing = {
-        key: report[key]
-        for key in ("worker_model", "worker_provider", "worker_route_family", "worker_effort",
-                    "custom_agent", "profile_inspected")
-    }
-    requested[target / "routing.json"] = (json.dumps(routing, indent=2) + "\n").encode()
+            requested[target / relative] = source.read_bytes()
+    # Each role owns one binding file. A named builder's binding is written only
+    # for that role, so installing it cannot rewrite the legacy binding or another
+    # builder's pinned route. Nothing here deletes files the package did not write.
+    if builder is None:
+        binding_path = target / builders.LEGACY_BINDING_NAME
+        binding = {key: report[key] for key in LEGACY_BINDING_KEYS}
+        description = LEGACY_ROLE_DESCRIPTION
+    else:
+        binding_path = builders.binding_path(target, role_id)
+        binding = builders.binding_payload(report, builder)
+        description = builders.role_description(builder, report["worker_model"])
+    requested[binding_path] = (json.dumps(binding, indent=2) + "\n").encode()
     instructions = (BUNDLE / "WORKER-INSTRUCTIONS.md").read_text(encoding="utf-8").strip()
     # JSON basic strings are valid TOML basic strings for these generated values.
     role = (
-        f'name = {json.dumps(ROLE)}\n'
-        'description = "Implement an orchestrator-approved task bundle using the installed worker route; never orchestrate or self-approve."\n'
+        f'name = {json.dumps(role_id)}\n'
+        f'description = {json.dumps(description, ensure_ascii=False)}\n'
         f'model = {json.dumps(report["worker_model"])}\n'
     )
     if report["worker_effort"]:
@@ -179,6 +218,67 @@ def apply_changes(changes: list[dict], codex_home: Path, input_hashes: dict[str,
     return receipt
 
 
+def allowed_undo_target(path: Path, agents: Path, policy: set[Path], root: Path) -> bool:
+    """Allowlist for undo: known roles, known bindings, policy files, skill files.
+
+    Skill files are package-owned, so their paths stay allowed as before. Agent
+    roles and builder bindings are restricted to the roles this module knows, so a
+    tampered receipt cannot add a role or binding this package never installs.
+    """
+    if path in policy:
+        return True
+    if path.parent == agents and path.suffix == ".toml":
+        return builders.known_role(path.stem)
+    if not path.resolve().is_relative_to(root.resolve()):
+        return False
+    relative = path.resolve().relative_to(root.resolve())
+    if relative.parts and relative.parts[0] == builders.BUILDERS_DIRNAME:
+        return builders.binding_role(relative) is not None
+    return True
+
+
+def transaction_shared_targets(targets: set[Path], agents: Path, policy: set[Path], root: Path) -> list[Path]:
+    """Entries of a transaction that other installed roles depend on.
+
+    A role's own agent file and its own `builders/<role>.json` binding are private
+    to that role. Everything else the package installs - the shared skill files and
+    the managed policy block - is depended on by every installed role, so undoing
+    it while another role remains would leave that role pointing at a skill the
+    package no longer installs.
+    """
+    shared = []
+    for path in sorted(targets):
+        if path in policy:
+            shared.append(path)
+            continue
+        if path.parent == agents:
+            continue
+        resolved = path.resolve()
+        if resolved.is_relative_to(root.resolve()):
+            relative = resolved.relative_to(root.resolve())
+            if relative.parts and relative.parts[0] == builders.BUILDERS_DIRNAME:
+                continue
+            if relative == Path(builders.LEGACY_BINDING_NAME):
+                continue
+            shared.append(path)
+    return shared
+
+
+def remaining_package_targets(exclude: set[Path], agents: Path, root: Path) -> list[Path]:
+    """Installed roles and bindings outside this transaction, legacy included."""
+    found = []
+    for role in sorted(builders.KNOWN_ROLES):
+        path = agents / f"{role}.toml"
+        if path not in exclude and path.exists():
+            found.append(path)
+    candidates = [root / builders.LEGACY_BINDING_NAME]
+    candidates += [builders.binding_path(root, role) for role in sorted(builders.KNOWN_ROLES)]
+    for path in candidates:
+        if path not in exclude and path.exists():
+            found.append(path)
+    return found
+
+
 def undo(receipt: Path, home: Path, codex_home: Path, apply: bool) -> None:
     no_symlinks(receipt)
     if ".." in receipt.parts or not receipt.resolve().is_relative_to((codex_home / "astra-flash-install-backups").resolve()):
@@ -187,11 +287,12 @@ def undo(receipt: Path, home: Path, codex_home: Path, apply: bool) -> None:
     if record.get("format") != 1 or record.get("status") != "installed":
         raise SetupError("This receipt does not describe an installed, undoable transaction.")
     root = home / ".agents" / "skills" / SKILL
-    fixed = {codex_home / "agents" / f"{ROLE}.toml", codex_home / "AGENTS.md", codex_home / "AGENTS.override.md"}
+    agents = codex_home / "agents"
+    policy = {codex_home / "AGENTS.md", codex_home / "AGENTS.override.md"}
     pending = []
     for entry in record["files"]:
         path = Path(entry["path"])
-        if not path.is_absolute() or ".." in path.parts or (path not in fixed and not path.resolve().is_relative_to(root.resolve())):
+        if not path.is_absolute() or ".." in path.parts or not allowed_undo_target(path, agents, policy, root):
             raise SetupError("The receipt contains a target outside this package's installation paths.")
         current = contents(path)
         if digest(current) != entry["after_hash"]:
@@ -205,6 +306,22 @@ def undo(receipt: Path, home: Path, codex_home: Path, apply: bool) -> None:
         if digest(before) != entry["before_hash"]:
             raise SetupError("A backup no longer matches its receipt. Nothing was restored.")
         pending.append((path, before, entry["mode"]))
+    # Fail closed before the first write. A receipt for the first installed role
+    # carries the shared skill files and the policy; restoring them while a later
+    # role is still installed would strand that role without the skill it depends
+    # on. Role-only transactions stay allowed, so undoing later roles in reverse
+    # install order is never blocked.
+    targets = {path for path, _before, _mode in pending}
+    if transaction_shared_targets(targets, agents, policy, root):
+        remaining = remaining_package_targets(targets, agents, root)
+        if remaining:
+            names = ", ".join(sorted(path.name for path in remaining))
+            raise SetupError(
+                "Refusing undo: this transaction owns the shared skill files or the managed "
+                f"policy, and {names} would remain installed without them. Undo the installed "
+                "builders in reverse install order (most recently installed first), then retry "
+                "this receipt. Nothing was restored."
+            )
     for path, before, mode in pending:
         print(f"{'RESTORE' if before is not None else 'REMOVE'} {path}")
         if apply:
@@ -238,11 +355,20 @@ def main() -> int:
     parser.add_argument("--codex-home", help="override CODEX_HOME")
     parser.add_argument("--profile", help="inspect a specific existing profile; does not change profile selection")
     parser.add_argument(
+        "--builder",
+        choices=sorted(builders.PRESETS),
+        help=(
+            "install one named builder role next to any others already installed; "
+            "without this option the legacy astra_flash_builder worker is installed or updated"
+        ),
+    )
+    parser.add_argument(
         "--worker-route",
         type=route_argument,
         metavar="ROUTE",
         help=(
-            "pin one reviewed worker route, including a configured local/<ollama-tag> route "
+            "pin one reviewed route for this install (with --builder it must be a route that "
+            "preset allows, including a configured local/<ollama-tag> route for the ollama preset) "
             f"(default: existing routing binding, then {DEFAULT_ROUTE})"
         ),
     )
@@ -253,10 +379,23 @@ def main() -> int:
         if args.undo:
             undo(args.undo, home, codex_home, args.apply)
             return 0
-        binding = home / ".agents" / "skills" / SKILL / "routing.json"
-        worker_route = resolve_worker_route(args.worker_route, binding)
-        report, _private_url = inspect(home, codex_home, args.profile, worker_route)
-        changes = plan_changes(home, codex_home, report, not args.no_policy, args.replace)
+        skill_dir = home / ".agents" / "skills" / SKILL
+        spec = builders.preset(args.builder) if args.builder else None
+        if spec is None:
+            binding = skill_dir / builders.LEGACY_BINDING_NAME
+            worker_route = resolve_worker_route(args.worker_route, binding)
+        else:
+            binding = builders.binding_path(skill_dir, spec.role)
+            worker_route = builders.resolve_builder_route(spec.key, args.worker_route, binding)
+        report, _private_url = inspect(
+            home,
+            codex_home,
+            args.profile,
+            worker_route,
+            role=spec.role if spec else ROLE,
+            builder=spec.key if spec else None,
+        )
+        changes = plan_changes(home, codex_home, report, not args.no_policy, args.replace, builder=spec)
         print(json.dumps(report, indent=2))
         for change in changes:
             print(f"{'UPDATE' if change['before'] is not None else 'CREATE'} {change['path']}")
@@ -264,9 +403,12 @@ def main() -> int:
             print("Preview only. No files changed. Add --apply after reviewing these destinations.")
             return 0
         receipt = apply_changes(changes, codex_home, report["input_hashes"])
+        if receipt and spec:
+            print(f"Installed builder {spec.label} as {spec.role} on {worker_route}.")
         print(f"Installed. Undo receipt: {receipt}" if receipt else "Already installed; no changes needed.")
         print("config.toml and router/authentication files were not written. No model request was made.")
-        print("Fully quit/reopen the host app, then start an Astra session. Runtime model identity still needs a real delegated-task check.")
+        print("Fully quit/reopen the host app, then start a session with your orchestrator "
+              "(Astra or Terra). Runtime model identity still needs a real delegated-task check.")
         return 0
     except (SetupError, OSError, ValueError) as exc:
         message = str(exc) if isinstance(exc, SetupError) else f"Local installation error ({type(exc).__name__}); inspect locally."

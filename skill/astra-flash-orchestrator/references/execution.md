@@ -9,6 +9,11 @@ implementation, tests, debugging, and routine browser/visual QA. This avoids a
 second CLI process, environment-variable command string, automatic commits, and
 accidental provider bypass. No `FLASH_WORKER_CMD` or external run_worker.sh is needed.
 
+When several builders are installed, name the one role this bundle goes to and say
+which it was in the dispatch and the final report. Installed roles are alternatives
+for different tasks, not a set to launch together: nothing in this workflow starts
+a second builder because another one exists.
+
 Before editing, capture the workspace root, current branch/HEAD when Git exists,
 tracked/staged diff and untracked-file inventory. Preserve relevant pre-existing
 file content in a safe local baseline when it is necessary to distinguish the
@@ -34,7 +39,8 @@ when their dependencies are satisfied, writable scopes do not overlap, and
 separate workspaces are actually available. A separate agent thread alone does
 not satisfy workspace isolation. Shared types, dependency manifests/lockfiles,
 routes, migrations, generated outputs, and schema files are usually contention
-points; serialize them.
+points; serialize them. Extra installed builders do not by themselves justify a
+second writer.
 
 For Git worktrees, Astra establishes a known base and records it PER TASK in the
 plan/report, not via shared `git config`. Honor the project's Git permissions.

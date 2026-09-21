@@ -15,6 +15,7 @@ SCRIPTS = ROOT / 'skill' / 'astra-flash-orchestrator' / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(ROOT))
 import install
+import builders
 from local_config import (
     DEFAULT_ROUTE, FLASH_ROUTES, MULTI_MODEL_ROUTES, ROUTE, ROLE, SKILL, SUPPORTED_ROUTES,
     SetupError, inspect, local_route_cloud_variant, model_entries, require_route,
@@ -23,7 +24,9 @@ from local_config import (
 from validate_plan import PlanError, validate
 
 
-class SetupFixture(unittest.TestCase):
+class _Fixture(unittest.TestCase):
+    """Synthetic home, config and catalog shared by more than one test case."""
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.home = Path(self.temp.name).resolve()
@@ -71,6 +74,8 @@ class SetupFixture(unittest.TestCase):
         changes = install.plan_changes(self.home, self.codex, report, True, False)
         return install.apply_changes(changes, self.codex, report['input_hashes'])
 
+
+class SetupFixture(_Fixture):
     def test_dry_run_changes_nothing_and_redacts_secrets(self):
         before = {str(p): p.read_bytes() for p in self.home.rglob('*') if p.is_file()}
         result = self.cli()
@@ -643,6 +648,418 @@ class SetupFixture(unittest.TestCase):
         self.config.write_text(self.config.read_text() + '# Changed by another process\n')
         with self.assertRaises(SetupError):
             install.apply_changes(changes, self.codex, report['input_hashes'])
+
+
+class NamedBuilderTests(_Fixture):
+    """One machine, several separately pinned builder roles."""
+
+    REQUESTED = {
+        'grok': ('astra_terra_builder_grok', 'grok-oauth/grok-4.6', 'cloud'),
+        'fable': ('astra_terra_builder_fable', 'openrouter/claude-fable-5.1', 'cloud'),
+        'deepseek-flash': ('astra_terra_builder_deepseek_flash', 'deepseek/deepseek-v4.1-flash', 'flash'),
+    }
+
+    def set_catalog(self, routes, multi_agent_version='v2'):
+        """Publish one catalog entry per route, all at the same effort."""
+        self.catalog.write_text(json.dumps({'models': [
+            {'slug': route, 'multi_agent_version': multi_agent_version,
+             'default_reasoning_level': 'high',
+             'supported_reasoning_levels': [{'effort': 'high'}, {'effort': 'max'}]}
+            for route in routes
+        ]}))
+
+    def skill_root(self):
+        return self.home / '.agents' / 'skills' / SKILL
+
+    def binding(self, role):
+        return self.skill_root() / 'builders' / f'{role}.json'
+
+    def legacy_binding(self):
+        return self.skill_root() / 'routing.json'
+
+    def role_file(self, role):
+        return self.codex / 'agents' / f'{role}.toml'
+
+    def installed_doctor(self, *args):
+        """Run the doctor from the installed skill, as a user would."""
+        return subprocess.run(
+            [sys.executable, str(self.skill_root() / 'scripts' / 'doctor.py'),
+             '--home', str(self.home), '--codex-home', str(self.codex), *args],
+            capture_output=True, text=True)
+
+    def source_doctor(self, *args):
+        """Run the doctor from a source checkout, which installs no bindings."""
+        return subprocess.run(
+            [sys.executable, str(SCRIPTS / 'doctor.py'),
+             '--home', str(self.home), '--codex-home', str(self.codex), *args],
+            capture_output=True, text=True)
+
+    def receipt_of(self, result):
+        for line in result.stdout.splitlines():
+            if 'Undo receipt:' in line:
+                return Path(line.split('Undo receipt:', 1)[1].strip())
+        raise AssertionError(f'no undo receipt in output: {result.stdout!r} {result.stderr!r}')
+
+    def install_builder(self, key, *args):
+        result = self.cli('--builder', key, '--apply', *args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result
+
+    def test_preset_table_matches_the_accepted_contract(self):
+        expected = {
+            'grok': 'astra_terra_builder_grok',
+            'fable': 'astra_terra_builder_fable',
+            'deepseek-flash': 'astra_terra_builder_deepseek_flash',
+            'deepseek-pro': 'astra_terra_builder_deepseek_pro',
+            'grok-4-5': 'astra_terra_builder_grok_4_5',
+            'ollama': 'astra_terra_builder_ollama',
+        }
+        self.assertEqual({key: spec.role for key, spec in builders.PRESETS.items()}, expected)
+        for key, role in expected.items():
+            with self.subTest(builder=key):
+                self.assertNotIn('/', role)
+                self.assertNotIn(' ', role)
+                self.assertTrue(builders.ROLE_PATTERN.fullmatch(role))
+                self.assertIn(role, builders.KNOWN_ROLES)
+                self.assertEqual(builders.binding_role(Path('builders') / f'{role}.json'), role)
+        self.assertIn(ROLE, builders.KNOWN_ROLES)
+        self.assertEqual(builders.PRESETS['grok'].default_route, 'grok-oauth/grok-4.6')
+        self.assertEqual(builders.PRESETS['fable'].default_route, 'openrouter/claude-fable-5.1')
+        self.assertEqual(builders.PRESETS['deepseek-flash'].default_route, 'deepseek/deepseek-v4.1-flash')
+        self.assertEqual(builders.PRESETS['deepseek-pro'].default_route, 'deepseek/deepseek-v4-pro')
+        self.assertEqual(builders.PRESETS['grok-4-5'].default_route, 'grok-oauth/grok-4.5')
+        self.assertIsNone(builders.PRESETS['ollama'].default_route)
+
+    def test_example_table_matches_the_preset_module(self):
+        table = json.loads((ROOT / 'examples' / 'named-builders' / 'builders.json').read_text())
+        self.assertEqual(table['schema_version'], 1)
+        entries = {entry['preset']: entry for entry in table['builders']}
+        self.assertEqual(set(entries), set(builders.PRESETS))
+        for key, spec in builders.PRESETS.items():
+            with self.subTest(builder=key):
+                entry = entries[key]
+                self.assertEqual(entry['role'], spec.role)
+                self.assertEqual(entry['label'], spec.label)
+                self.assertEqual(entry['default_route'], spec.default_route)
+                self.assertEqual(tuple(entry['allowed_routes']), spec.allowed_routes)
+                self.assertEqual(entry['allow_local'], spec.allow_local)
+                self.assertNotIn('/', entry['role'])
+                self.assertNotIn(' ', entry['role'])
+
+    def test_requested_builders_coexist_with_separate_routes(self):
+        self.set_catalog(route for _, route, _ in self.REQUESTED.values())
+        for key in self.REQUESTED:
+            with self.subTest(builder=key):
+                self.install_builder(key)
+        for key, (role, route, family) in self.REQUESTED.items():
+            with self.subTest(builder=key):
+                raw = self.role_file(role).read_text()
+                role_toml = tomllib.loads(raw)
+                self.assertEqual(role_toml['name'], role)
+                self.assertEqual(role_toml['model'], route)
+                self.assertFalse(role_toml['agents']['enabled'])
+                self.assertNotIn('sandbox_mode', role_toml)
+                self.assertNotIn('model_provider', role_toml)
+                self.assertIn(builders.PRESETS[key].label, raw)
+                binding = json.loads(self.binding(role).read_text())
+                self.assertEqual(binding['builder'], key)
+                self.assertEqual(binding['custom_agent'], role)
+                self.assertEqual(binding['worker_model'], route)
+                self.assertEqual(binding['worker_route_family'], family)
+                self.assertEqual(binding['worker_effort'], 'high')
+        # A named install never creates or rewrites the legacy worker.
+        self.assertFalse(self.role_file(ROLE).exists())
+        self.assertFalse(self.legacy_binding().exists())
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_reinstalling_one_builder_preserves_the_others_bytes(self):
+        self.set_catalog(['grok-oauth/grok-4.6', 'grok-oauth/grok-4.5',
+                          'openrouter/claude-fable-5.1', 'deepseek/deepseek-v4.1-flash'])
+        for key in self.REQUESTED:
+            self.install_builder(key)
+        untouched = {
+            path: path.read_bytes()
+            for role in ('astra_terra_builder_fable', 'astra_terra_builder_deepseek_flash')
+            for path in (self.role_file(role), self.binding(role))
+        }
+        changed = self.cli('--builder', 'grok', '--worker-route', 'grok-oauth/grok-4.5',
+                           '--apply', '--replace')
+        self.assertEqual(changed.returncode, 0, changed.stderr)
+        grok = tomllib.loads(self.role_file('astra_terra_builder_grok').read_text())
+        self.assertEqual(grok['model'], 'grok-oauth/grok-4.5')
+        grok_binding = json.loads(self.binding('astra_terra_builder_grok').read_text())
+        self.assertEqual(grok_binding['worker_model'], 'grok-oauth/grok-4.5')
+        for path, before in untouched.items():
+            self.assertEqual(path.read_bytes(), before, path)
+
+    def test_builder_content_change_requires_explicit_replace(self):
+        self.set_catalog(['grok-oauth/grok-4.6'])
+        self.install_builder('grok')
+        target = self.role_file('astra_terra_builder_grok')
+        edited = target.read_text() + '# edited by the operator\n'
+        target.write_text(edited)
+        refused = self.cli('--builder', 'grok', '--apply')
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn('--replace', refused.stderr)
+        self.assertEqual(target.read_text(), edited)
+        replaced = self.cli('--builder', 'grok', '--apply', '--replace')
+        self.assertEqual(replaced.returncode, 0, replaced.stderr)
+        self.assertNotIn('edited by the operator', target.read_text())
+
+    def test_doctor_reads_each_selected_builder_binding(self):
+        self.set_catalog(route for _, route, _ in self.REQUESTED.values())
+        for key in self.REQUESTED:
+            self.install_builder(key)
+        for key, (role, route, family) in self.REQUESTED.items():
+            with self.subTest(builder=key):
+                result = self.installed_doctor('--builder', key)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                report = json.loads(result.stdout)
+                self.assertEqual(report['status'], 'static-ready')
+                self.assertEqual(report['worker_model'], route)
+                self.assertEqual(report['worker_route_family'], family)
+                self.assertEqual(report['custom_agent'], role)
+                self.assertEqual(report['builder_preset'], key)
+                self.assertTrue(report['catalog_advertises_subagent'])
+                self.assertFalse(report['runtime_verified'])
+
+    def test_doctor_refuses_an_uninstalled_builder_without_a_route(self):
+        result = self.source_doctor('--builder', 'grok')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('No Astra/Terra builder Grok binding is installed', result.stderr)
+        self.assertIn('--builder grok', result.stderr)
+
+    def test_doctor_can_precheck_a_route_before_installing_that_builder(self):
+        self.set_catalog(['grok-oauth/grok-4.6'])
+        result = self.source_doctor('--builder', 'grok', '--worker-route', 'grok-oauth/grok-4.6')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['worker_model'], 'grok-oauth/grok-4.6')
+
+    def test_legacy_and_named_bindings_are_isolated(self):
+        self.set_catalog(['deepseek/deepseek-v4.1-flash', 'grok-oauth/grok-4.6'])
+        self.apply()
+        legacy_role = self.role_file(ROLE).read_bytes()
+        legacy_binding = self.legacy_binding().read_bytes()
+        self.install_builder('grok')
+        self.assertEqual(self.role_file(ROLE).read_bytes(), legacy_role)
+        self.assertEqual(self.legacy_binding().read_bytes(), legacy_binding)
+        grok_role = self.role_file('astra_terra_builder_grok').read_bytes()
+        grok_binding = self.binding('astra_terra_builder_grok').read_bytes()
+        legacy_again = self.cli('--apply')
+        self.assertEqual(legacy_again.returncode, 0, legacy_again.stderr)
+        self.assertIn('no changes needed', legacy_again.stdout)
+        self.assertEqual(self.role_file('astra_terra_builder_grok').read_bytes(), grok_role)
+        self.assertEqual(self.binding('astra_terra_builder_grok').read_bytes(), grok_binding)
+        self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def snapshot_installation(self):
+        """Every installed file, so a refused undo can be proved to change nothing."""
+        return {
+            str(path): path.read_bytes()
+            for path in sorted((self.codex / 'agents').glob('*.toml'))
+        } | {
+            str(path): path.read_bytes()
+            for path in sorted(self.skill_root().rglob('*')) if path.is_file()
+        }
+
+    def test_undo_of_the_first_install_is_refused_while_later_builders_remain(self):
+        # The first receipt carries the shared skill files and the managed policy.
+        # Restoring it first would strand the roles installed after it.
+        self.set_catalog(route for _, route, _ in self.REQUESTED.values())
+        receipts = {key: self.receipt_of(self.install_builder(key)) for key in self.REQUESTED}
+        before = self.snapshot_installation()
+        refused = self.cli('--undo', str(receipts['grok']), '--apply')
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn('reverse install order', refused.stderr)
+        self.assertIn('astra_terra_builder_deepseek_flash.toml', refused.stderr)
+        self.assertEqual(self.snapshot_installation(), before)
+        preview = self.cli('--undo', str(receipts['grok']))
+        self.assertEqual(preview.returncode, 2)
+        self.assertEqual(self.snapshot_installation(), before)
+
+    def test_undo_in_reverse_install_order_removes_every_builder(self):
+        self.set_catalog(route for _, route, _ in self.REQUESTED.values())
+        receipts = {key: self.receipt_of(self.install_builder(key)) for key in self.REQUESTED}
+        for key in reversed(list(self.REQUESTED)):
+            with self.subTest(undo=key):
+                result = self.cli('--undo', str(receipts[key]), '--apply')
+                self.assertEqual(result.returncode, 0, result.stderr)
+        for role in builders.KNOWN_ROLES:
+            self.assertFalse(self.role_file(role).exists())
+        self.assertFalse((self.skill_root() / 'builders').exists())
+        self.assertFalse(self.skill_root().exists())
+        self.assertEqual(self.policy.read_bytes(), self.original_policy)
+
+    def test_legacy_then_named_undo_follows_reverse_install_order(self):
+        self.set_catalog(['deepseek/deepseek-v4.1-flash', 'grok-oauth/grok-4.6'])
+        legacy_receipt = self.apply()
+        named_receipt = self.receipt_of(self.install_builder('grok'))
+        before = self.snapshot_installation()
+        refused = self.cli('--undo', str(legacy_receipt), '--apply')
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn('reverse install order', refused.stderr)
+        self.assertIn('astra_terra_builder_grok.toml', refused.stderr)
+        self.assertEqual(self.snapshot_installation(), before)
+        self.assertEqual(self.cli('--undo', str(named_receipt), '--apply').returncode, 0)
+        self.assertEqual(self.cli('--undo', str(legacy_receipt), '--apply').returncode, 0)
+        self.assertFalse(self.role_file(ROLE).exists())
+        self.assertFalse(self.legacy_binding().exists())
+        self.assertEqual(self.policy.read_bytes(), self.original_policy)
+
+    def test_role_only_undo_is_not_blocked_by_other_installed_builders(self):
+        # A receipt that only owns one role and its binding may always be undone.
+        self.set_catalog(['deepseek/deepseek-v4.1-flash', 'grok-oauth/grok-4.6'])
+        named_receipt = self.receipt_of(self.install_builder('grok'))
+        legacy_receipt = self.apply()
+        legacy_role = self.role_file(ROLE).read_bytes()
+        done = self.cli('--undo', str(legacy_receipt), '--apply')
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertFalse(self.role_file(ROLE).exists())
+        self.assertTrue(self.role_file('astra_terra_builder_grok').exists())
+        self.assertTrue(self.binding('astra_terra_builder_grok').exists())
+        # The named builder's transaction still owns the policy and the skill.
+        self.assertIn(install.BEGIN, self.policy.read_bytes())
+        self.assertTrue(self.skill_root().exists())
+        self.assertEqual(self.cli('--undo', str(named_receipt), '--apply').returncode, 0)
+        self.assertFalse((self.home / '.agents' / 'skills' / SKILL).exists())
+        self.assertEqual(self.policy.read_bytes(), self.original_policy)
+
+    def test_undo_still_refuses_after_a_later_edit(self):
+        self.set_catalog(['grok-oauth/grok-4.6'])
+        receipt = self.receipt_of(self.install_builder('grok'))
+        target = self.binding('astra_terra_builder_grok')
+        target.write_text(target.read_text() + ' ')
+        changed = target.read_bytes()
+        result = self.cli('--undo', str(receipt), '--apply')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(target.read_bytes(), changed)
+        self.assertTrue(self.role_file('astra_terra_builder_grok').exists())
+
+    def test_undo_receipt_allowlist_rejects_unknown_roles_and_bindings(self):
+        self.set_catalog(['grok-oauth/grok-4.6'])
+        receipt = self.receipt_of(self.install_builder('grok'))
+        record = json.loads(receipt.read_text())
+        for index, entry in enumerate(record['files']):
+            if Path(entry['path']).parent == self.codex / 'agents':
+                entry['path'] = str(self.codex / 'agents' / 'unknown_builder_role.toml')
+            elif Path(entry['path']).name == 'astra_terra_builder_grok.json':
+                entry['path'] = str(self.skill_root() / 'builders' / 'unknown_builder_role.json')
+        receipt.write_text(json.dumps(record))
+        result = self.cli('--undo', str(receipt), '--apply')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('outside this package', result.stderr)
+        self.assertTrue(self.role_file('astra_terra_builder_grok').exists())
+        self.assertTrue(self.binding('astra_terra_builder_grok').exists())
+
+    def test_absent_or_v1_route_fails_before_any_write(self):
+        for spec, version in (({'std': ['openrouter/claude-fable-5.1']}, 'v2'),
+                              ({'std': ['grok-oauth/grok-4.6']}, 'v1'),
+                              ({'std': []}, 'v2')):
+            with self.subTest(version=version, routes=spec['std']):
+                self.set_catalog(spec['std'], version)
+                result = self.cli('--builder', 'grok', '--apply')
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse((self.home / '.agents').exists())
+                self.assertFalse((self.codex / 'agents').exists())
+                self.assertEqual(self.config.read_bytes(), self.original_config)
+
+    def test_ollama_builder_requires_an_explicit_local_route_first(self):
+        self.set_catalog(['local/qwen3.8:27b-mlx'])
+        missing = self.cli('--builder', 'ollama', '--apply')
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn('must name it', missing.stderr)
+        self.assertFalse((self.home / '.agents').exists())
+        self.install_builder('ollama', '--worker-route', 'local/qwen3.8:27b-mlx')
+        binding = json.loads(self.binding('astra_terra_builder_ollama').read_text())
+        self.assertEqual(binding['worker_model'], 'local/qwen3.8:27b-mlx')
+        self.assertEqual(binding['worker_route_family'], 'local')
+        again = self.cli('--builder', 'ollama', '--apply')
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn('no changes needed', again.stdout)
+
+    def test_worker_route_override_must_match_the_preset(self):
+        self.set_catalog(['grok-oauth/grok-4.6', 'grok-oauth/grok-4.5',
+                          'openrouter/claude-fable-5.1', 'deepseek/deepseek-v4.1-flash',
+                          'deepseek/deepseek-v4-pro', 'local/qwen3.8:27b-mlx'])
+        mismatches = {
+            'grok': 'openrouter/claude-fable-5.1',
+            'fable': 'grok-oauth/grok-4.6',
+            'deepseek-flash': 'openrouter/deepseek-v4.1-flash',
+            'deepseek-pro': 'deepseek/deepseek-v4.1-flash',
+            'grok-4-5': 'grok-oauth/grok-4.6',
+            'ollama': 'grok-oauth/grok-4.6',
+        }
+        for key, route in mismatches.items():
+            with self.subTest(builder=key, route=route):
+                result = self.cli('--builder', key, '--worker-route', route, '--apply')
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('cannot pin', result.stderr)
+                self.assertFalse((self.home / '.agents').exists())
+
+    def test_grok_builder_accepts_either_oauth_route(self):
+        self.set_catalog(['grok-oauth/grok-4.6', 'grok-oauth/grok-4.5'])
+        for route in ('grok-oauth/grok-4.6', 'grok-oauth/grok-4.5'):
+            with self.subTest(route=route):
+                args = ['--worker-route', route, '--apply'] + ([] if route.endswith('4.6') else ['--replace'])
+                result = self.cli('--builder', 'grok', *args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                role = tomllib.loads(self.role_file('astra_terra_builder_grok').read_text())
+                self.assertEqual(role['model'], route)
+
+    def test_deepseek_pro_builder_pins_the_direct_route(self):
+        self.set_catalog(['deepseek/deepseek-v4-pro'])
+        self.install_builder('deepseek-pro')
+        role = tomllib.loads(self.role_file('astra_terra_builder_deepseek_pro').read_text())
+        self.assertEqual(role['model'], 'deepseek/deepseek-v4-pro')
+        binding = json.loads(self.binding('astra_terra_builder_deepseek_pro').read_text())
+        self.assertEqual(binding['worker_provider'], 'DeepSeek API')
+        self.assertEqual(binding['worker_effort'], 'high')
+
+    def test_named_builder_plan_never_writes_the_legacy_binding(self):
+        self.set_catalog(['grok-oauth/grok-4.6'])
+        report, _ = inspect(self.home, self.codex, worker_route='grok-oauth/grok-4.6',
+                            role='astra_terra_builder_grok', builder='grok')
+        changes = install.plan_changes(
+            self.home, self.codex, report, True, False, builder=builders.PRESETS['grok']
+        )
+        targets = {change['path'] for change in changes}
+        self.assertIn(self.role_file('astra_terra_builder_grok'), targets)
+        self.assertIn(self.binding('astra_terra_builder_grok'), targets)
+        self.assertNotIn(self.legacy_binding(), targets)
+        self.assertNotIn(self.role_file(ROLE), targets)
+        self.assertNotIn(self.config, targets)
+
+    def test_stray_source_bindings_cannot_overwrite_installed_bindings(self):
+        # A checkout that somehow contains runtime bindings must not be able to
+        # publish them over the installed legacy binding or another role's route.
+        self.set_catalog(['grok-oauth/grok-4.6', 'deepseek/deepseek-v4.1-flash'])
+        self.install_builder('grok')
+        self.apply()
+        grok_before = self.binding('astra_terra_builder_grok').read_bytes()
+        legacy_before = self.legacy_binding().read_bytes()
+        stray = self.home / 'stray-source'
+        (stray / 'builders').mkdir(parents=True)
+        (stray / 'SKILL.md').write_text('# stray skill copy\n')
+        (stray / 'routing.json').write_text(json.dumps({'worker_model': 'stray/route'}))
+        for role in ('astra_terra_builder_grok', 'astra_terra_builder_fable'):
+            (stray / 'builders' / f'{role}.json').write_text(
+                json.dumps({'worker_model': 'stray/route'}))
+        report, _ = inspect(self.home, self.codex, worker_route='grok-oauth/grok-4.6',
+                            role='astra_terra_builder_grok', builder='grok')
+        with patch.object(install, 'SKILL_SOURCE', stray):
+            changes = install.plan_changes(self.home, self.codex, report, True, True,
+                                           builder=builders.PRESETS['grok'])
+            targets = {change['path'] for change in changes}
+            install.apply_changes(changes, self.codex, report['input_hashes'])
+        # An ordinary skill file is still copied; generated bindings never are.
+        self.assertIn(self.skill_root() / 'SKILL.md', targets)
+        self.assertNotIn(self.skill_root() / 'routing.json', targets)
+        self.assertNotIn(self.binding('astra_terra_builder_fable'), targets)
+        self.assertNotIn(self.binding('astra_terra_builder_grok'), targets)
+        self.assertEqual(self.legacy_binding().read_bytes(), legacy_before)
+        self.assertEqual(self.binding('astra_terra_builder_grok').read_bytes(), grok_before)
+        self.assertFalse(self.binding('astra_terra_builder_fable').exists())
+        self.assertEqual((self.skill_root() / 'SKILL.md').read_text(), '# stray skill copy\n')
 
 
 class PolicyTests(unittest.TestCase):

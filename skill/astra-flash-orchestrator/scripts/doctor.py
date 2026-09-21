@@ -9,9 +9,10 @@ import urllib.error
 import urllib.request
 sys.dont_write_bytecode = True
 from local_config import (
-    DEFAULT_ROUTE, SetupError, default_locations, inspect, model_entries, model_id,
+    DEFAULT_ROUTE, ROLE, SetupError, default_locations, inspect, model_entries, model_id,
     require_route, resolve_worker_route,
 )
+import builders
 
 
 def route_argument(value: str) -> str:
@@ -54,11 +55,17 @@ def main() -> int:
     parser.add_argument("--codex-home")
     parser.add_argument("--profile")
     parser.add_argument(
+        "--builder",
+        choices=sorted(builders.PRESETS),
+        help="check one named builder's own binding instead of the legacy worker binding",
+    )
+    parser.add_argument(
         "--worker-route",
         type=route_argument,
         metavar="ROUTE",
         help=(
-            "check a reviewed worker route, including a configured local/<ollama-tag> route "
+            "check a reviewed route, including a configured local/<ollama-tag> route (with "
+            "--builder it must be a route that preset allows) "
             f"(default: installed routing binding, then {DEFAULT_ROUTE})"
         ),
     )
@@ -70,9 +77,28 @@ def main() -> int:
     args = parser.parse_args()
     try:
         home, codex_home = default_locations(args.home, args.codex_home)
-        binding = Path(__file__).resolve().parents[1] / "routing.json"
-        worker_route = resolve_worker_route(args.worker_route, binding)
-        report, url = inspect(home, codex_home, args.profile, worker_route)
+        skill_dir = Path(__file__).resolve().parents[1]
+        spec = builders.preset(args.builder) if args.builder else None
+        if spec is None:
+            binding = skill_dir / builders.LEGACY_BINDING_NAME
+            worker_route = resolve_worker_route(args.worker_route, binding)
+        else:
+            binding = builders.binding_path(skill_dir, spec.role)
+            if not binding.exists() and args.worker_route is None:
+                raise SetupError(
+                    f"No {spec.label} binding is installed beside this skill. Install that builder "
+                    f"first with `--builder {spec.key}`, or check a route explicitly with "
+                    "--worker-route."
+                )
+            worker_route = builders.resolve_builder_route(spec.key, args.worker_route, binding)
+        report, url = inspect(
+            home,
+            codex_home,
+            args.profile,
+            worker_route,
+            role=spec.role if spec else ROLE,
+            builder=spec.key if spec else None,
+        )
         if args.check_local_router:
             check_local_catalog(url, worker_route)
             report["status"] = "local-catalog-ready"

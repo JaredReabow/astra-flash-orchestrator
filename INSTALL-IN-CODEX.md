@@ -10,6 +10,14 @@ route documented in this repository (for example deepseek/deepseek-v4-pro,
 grok-oauth/grok-4.6, grok-oauth/grok-4.5, openrouter/claude-fable-5.1, or a
 configured local/<ollama-tag>). Do not infer, enable or auto-select a provider.
 
+If I ask for named builders, install each one I name with
+`install.py --builder <preset>` (grok, fable, deepseek-flash, deepseek-pro,
+grok-4-5, ollama). Each install writes only that role's agent file and its own
+builders/<role>.json; never rewrite another builder's binding, never delete an
+existing role, and leave routing.json and astra_flash_builder alone unless I ask
+for the legacy worker. My root model may be Astra or Terra; leave it as it is.
+Do not install a builder I did not name.
+
 Read README.md, install.py, POLICY.md and WORKER-INSTRUCTIONS.md first.
 Inspect relevant local configuration without printing secrets, full private
 Router URLs, authentication contents or unrelated instructions.

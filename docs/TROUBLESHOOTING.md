@@ -4,6 +4,33 @@
 
 Check that installation ended with `Installed` or `Already installed`, not only a successful dry run. The expected file is `~/.agents/skills/astra-flash-orchestrator/SKILL.md`. Fully quit/reopen the host app, then start an Astra session. Check custom home locations and client skill discovery before reinstalling.
 
+## A named builder is missing or has the wrong route
+
+Each named builder is installed on its own: `python3 -B install.py --builder grok
+--replace --apply`. Installing one role never creates another, so a missing role
+means that preset was never installed. Check it with
+`python3 -B skill/astra-flash-orchestrator/scripts/doctor.py --builder grok`, which
+reads that role's own `builders/<role>.json` beside the installed skill. The legacy
+`astra_flash_builder` role keeps using `routing.json` and is unaffected either way.
+
+A route mismatch is refused before any file is written: `grok` accepts 4.6 or 4.5,
+`fable`, `deepseek-flash`, `deepseek-pro` and `grok-4-5` accept their exact route,
+and `ollama` needs an explicit `local/<ollama-tag>` on its first install. Passing a
+route from another preset is a configuration error, not something to work around by
+editing a binding by hand. Undo restores only the role named in the receipt and
+refuses unknown role or binding paths.
+
+## Undo says the builders must be undone in reverse install order
+
+The first builder installed in a machine also owns the shared skill files and the
+managed policy block; later installs find those files already correct and do not
+carry them. Restoring the first receipt while a later builder is still installed
+would leave that builder pointing at a skill the package no longer provides, so the
+undo is refused before anything is written. Undo the most recently installed
+builder first and work backwards; a receipt that only owns one role and its binding
+is never blocked this way. The legacy `astra_flash_builder` role and `routing.json`
+are part of the same ordering rule.
+
 ## Expected worker route is missing or different
 
 The direct default is `deepseek/deepseek-v4.1-flash`. A new alternate-provider

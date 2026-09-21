@@ -234,8 +234,15 @@ def inspect(
     codex_home: Path,
     profile: str | None = None,
     worker_route: str = ROUTE,
+    role: str = ROLE,
+    builder: str | None = None,
 ) -> tuple[dict, str]:
-    """Return a redacted static report and a PRIVATE local URL. Do not print URL."""
+    """Return a redacted static report and a PRIVATE local URL. Do not print URL.
+
+    `role` is the native agent the report describes: the legacy default, or one
+    named builder the caller already chose. `builder` records that preset in the
+    report for the doctor and the binding; it never selects anything here.
+    """
     worker_route = resolve_worker_route(worker_route)
     config_path = codex_home / "config.toml"
     config = read_toml(config_path)
@@ -379,7 +386,8 @@ def inspect(
         "worker_provider": route_provider(worker_route),
         "worker_route_family": route_family(worker_route),
         "worker_effort": effort,
-        "custom_agent": ROLE,
+        "custom_agent": role,
+        "builder_preset": builder,
         "profile_inspected": selected,
         "catalog_contains_worker": True,
         "catalog_advertises_subagent": True,

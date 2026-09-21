@@ -1,16 +1,52 @@
 # Validation evidence
 
-Version 1.3.0. Offline suite checked September 21, 2026 on macOS with Python
+Version 1.4.0. Offline suite checked September 22, 2026 on macOS with Python
 3.14.7, and repeated with Python 3.13.14. No provider account, credential or model
 request was involved.
 
 ## Verified
 
-- 82 offline tests passed, up from 63 in 1.2.0. Coverage includes installation dry
+- 104 offline tests passed, up from 63 in 1.2.0. Coverage includes installation dry
   runs, idempotence, original configuration preservation, scoped policy handling,
   profile/collision/symlink checks, URL validation, fake-secret redaction,
   generated role TOML, rollback, guarded undo, plan validation and release-file
   filtering.
+- Named builders coexist on one synthetic home: the three requested presets
+  (`grok`, `fable`, `deepseek-flash`) install together with separate role files and
+  separate `builders/<role>.json` bindings, and re-pinning one to its other allowed
+  route leaves the other roles' files byte-identical.
+- Legacy compatibility is scoped to the interface, not to file bytes. Installing
+  without `--builder` still uses the same CLI path, role name `astra_flash_builder`,
+  `routing.json` binding, pinning rules, refusal behavior and undo semantics. In a
+  direct comparison against the previous release's installer on the same synthetic
+  home and route, the generated `routing.json` was byte-identical, while
+  `agents/astra_flash_builder.toml` differed only in its `developer_instructions`
+  value - the same keys, name, description, model and effort, with the instruction
+  text this release intentionally updated. A named install neither creates nor
+  modifies either legacy file, and no document claims byte-identical role files.
+- Preset and route compatibility is enforced before any write: a route belonging to
+  another preset is refused with the preset's allowed list, `ollama` requires an
+  explicit `local/<ollama-tag>` on first install and then reuses its binding, and
+  Grok accepts either OAuth route. The preset table is asserted against the
+  published example so the two cannot drift.
+- `doctor.py --builder <preset>` reads that role's own binding and reports the
+  matching model, provider, family and preset, while the default doctor path stays
+  on the legacy binding.
+- Undo restores one role at a time and leaves the others, in any order, and still
+  refuses after a later edit to a managed file. A tampered receipt naming an
+  unknown role or an unknown binding is refused before anything is restored.
+- Absent, duplicated or `v1` routes for a named builder fail before the first
+  write, leaving no skill, agent or binding file behind.
+- Undo fails closed when a transaction owns the shared skill files or the managed
+  policy and another installed role or binding would be left behind, with
+  reverse-install-order guidance; the refusal happens before any write, and
+  role-only receipts stay allowed regardless of what else is installed. The legacy
+  role and its binding are covered by the same guard.
+- A synthetic source tree containing stray `routing.json` and `builders/*.json`
+  files was planned and applied with `--replace`: the ordinary skill file was
+  updated, and the installed legacy binding, the current role's binding and other
+  roles' bindings were all left exactly as installed, with no new binding created
+  from the stray copy.
 - Every reviewed worker route is accepted only when explicitly selected or
   preserved from an existing valid package binding and advertised as
   `multi_agent_version: "v2"`. Tests cover each new route
@@ -35,12 +71,12 @@ request was involved.
 - Existing backup-directory permissions are preserved, backup files and caches are
   excluded from skill installation, and release tests also cover private artifact
   exclusion, symlink rejection and inventory changes.
-- The static doctor was additionally run read-only against a local Codex Router
-  configuration: each newly supported route was either reported `static-ready` or
-  refused with its documented reason (`v1`, absent from the published catalog, a
-  cloud alias, or an unknown slug), and a same-model root reported the warning
-  instead of a refusal. Those runs read configuration only; nothing was written and
-  no request reached a provider.
+- Read-only previews against a local Codex Router configuration reported
+  `static-ready` for `--builder grok`, `--builder fable`, `--builder deepseek-flash`
+  and `--builder deepseek-pro`, each with its own role id and binding path, and
+  refused `--builder grok-4-5` because that route is listed as `v1` and
+  `--builder ollama` until an explicit local route is named. Every run planned its
+  writes without applying them and left the installation unchanged.
 - All seven Python files parse under the Python 3.11 grammar via
   `ast.parse(..., feature_version=(3, 11))`. A real 3.11 or 3.12 interpreter is not
   installed on this machine, so the suite itself was not re-run on the documented

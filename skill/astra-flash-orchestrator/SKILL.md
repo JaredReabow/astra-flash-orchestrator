@@ -8,6 +8,9 @@ description: Plan and execute substantial multi-file builds, features, migration
 Use the existing Codex Router, not a second agent CLI or API client. This skill
 provides the workflow; the custom agent and router select the worker model. Do
 not claim routing is verified from these instructions or a worker's self-report.
+Throughout this skill, "Astra" means the orchestrator at the root: an operator may
+run Astra or Terra, and nothing here selects or rewrites that choice. Builders are
+the separately installed worker roles, legacy or named.
 
 ## Supported orchestration workflow
 
@@ -41,21 +44,30 @@ cannot be established from the repo. When asked to plan only, do not implement.
 
 ## 2. Confirm routing before delegating
 
-Read `routing.json` in this installed skill and `references/routing.md`. Run the
-read-only `scripts/doctor.py` with the same CODEX_HOME/profile used by the session.
+Read the installed bindings and `references/routing.md`. Run the read-only
+`scripts/doctor.py` with the same CODEX_HOME/profile used by the session.
 The doctor reuses the installed route binding unless an explicit reviewed route
 is supplied. Never infer a provider from whichever catalog entry happens to exist.
 Its output is a static configuration check, not an end-to-end model test.
-The binding names one reviewed route: DeepSeek V4.1 Flash by default, or another
-route the operator pinned deliberately (`deepseek/deepseek-v4-pro`,
-`grok-oauth/grok-4.6`, `grok-oauth/grok-4.5`, `openrouter/claude-fable-5.1`, or a
-configured `local/<ollama-tag>`). The installed role is still named
-`astra_flash_builder`; read its model from the binding rather than assuming Flash.
+
+Two layouts exist and both are read-only facts, not choices this skill may change:
+
+- the legacy worker `astra_flash_builder` with `routing.json`;
+- named builders `astra_terra_builder_grok`, `astra_terra_builder_fable`,
+  `astra_terra_builder_deepseek_flash`, `astra_terra_builder_deepseek_pro`,
+  `astra_terra_builder_grok_4_5` and `astra_terra_builder_ollama`, each with its
+  own `builders/<role>.json`.
+
+Use `scripts/doctor.py --builder <preset>` to check one named builder, or
+`scripts/doctor.py` for the legacy binding. Read a role's model from its binding
+rather than assuming any route, and delegate to one role the session actually has
+installed. If the requested builder is absent, stop and report the installation
+step instead of substituting another role.
 Switching providers mid-task is not something this skill offers, and a root model
 equal to the worker route only means delegation will not change the model.
-Confirm the current ROOT is the user's selected orchestrator model (GPT-6 Astra in
-the documented setup) and that the native `astra_flash_builder` role is available.
-Do not change the root model or effort.
+Confirm the current ROOT is the user's selected orchestrator model (Astra or Terra,
+whichever the operator runs) and that the chosen builder role is available. Do not
+change the root model or effort.
 Inspect project/CLI/UI/managed overrides that the doctor cannot resolve.
 
 For an already-verified setup, reuse the verified configuration evidence rather
@@ -102,7 +114,9 @@ That linter checks structure, not the truth or quality of the design.
 ## 5. Dispatch and let the worker work
 
 Read `references/execution.md`. Use the host's actual native delegation tool with
-the installed `astra_flash_builder` role. Do not invent a slash command or tool
+one builder role the session actually has installed: the legacy
+`astra_flash_builder`, or the named role the operator selected for this task. Say
+which role and route you dispatched to. Do not invent a slash command or tool
 signature. If the tool exposes explicit model selection, use the exact installed
 worker slug. Do not use a default explorer/reviewer role that could override it.
 
@@ -112,11 +126,13 @@ Prefer a clean child context where the host supports it; never claim its context
 is empty if the host actually inherits history. No unnecessary full-transcript
 forking, duplicate repository investigation, or play-by-play log forwarding.
 
-Default to ONE active worker in the current workspace. A native subagent
-is not automatically a Git worktree or a security sandbox. Astra must not edit
-its claimed paths. Use two writers only when the plan explicitly identifies
-independent work and each has a real, verified separate workspace. See execution
-reference for dirty-tree, contract, and integration rules. No recursive agents.
+Default to ONE active worker in the current workspace, even when several builders
+are installed: installed roles are alternatives to choose from, not a pool to
+start together. A native subagent is not automatically a Git worktree or a
+security sandbox. The orchestrator must not edit the worker's claimed paths. Use
+two writers only when the plan explicitly identifies independent work and each has
+a real, verified separate workspace. See execution reference for dirty-tree,
+contract, and integration rules. No recursive agents.
 
 Let the worker complete its internal implementation, testing, debugging, and
 routine UI-validation loop. Use the longest practical native wait and allow it to

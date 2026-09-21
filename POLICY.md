@@ -3,13 +3,16 @@
 
 For substantial builds, multi-file features, migrations, or refactors, load
 `$astra-flash-orchestrator` before implementation. Keep the orchestrator at the
-root as planner, architect, reviewer, and integrator. Delegate well-specified
-implementation bundles to the native `astra_flash_builder` agent through the
-existing Codex Router. That role runs DeepSeek V4.1 Flash by default; an operator
-may pin one other already-configured reviewed route instead. Use one worker by
-default; do not create an agent for each tiny coding step. Prefer this native
-workflow over an older `flash-build` external-runner skill for the same task; do
-not load both execution paths.
+root as planner, architect, reviewer, and integrator. That root is the operator's
+own choice and is never rewritten here: keep whichever orchestrator is selected,
+including Astra or Terra. Delegate well-specified implementation bundles to one
+explicitly named, already installed builder role through the existing Codex
+Router. `astra_flash_builder` is the legacy default; the named
+`astra_terra_builder_*` roles are separate, separately pinned builders that
+coexist. Use one worker by default; do not create an agent for each tiny coding
+step and do not start several writers for one bundle. Prefer this native workflow
+over an older `flash-build` external-runner skill for the same task; do not load
+both execution paths.
 
 Thin-root orchestration is the only supported delegated workflow; there is no
 mode selector or alternate full-Astra orchestration setting. After establishing
@@ -42,10 +45,10 @@ migration, production, or shared-infrastructure risk. High assurance is an
 exception triggered by evidence, not the routine operating mode.
 
 Do not change the root model, silently fall back to a different worker model,
-auto-enable a provider, launch another agent CLI, loosen permissions, expose
-secrets, auto-commit, push, deploy, or start paid setup smoke tests. Normal
-delegated implementation uses the provider pinned by the installed worker route
-(DeepSeek V4.1 Flash unless the operator pinned another reviewed route); obey the
-user's data-sharing and spending restrictions. Installation is not evidence of a
-successful routed model request.
+auto-enable a provider, rewrite another builder's binding, launch another agent
+CLI, loosen permissions, expose secrets, auto-commit, push, deploy, or start paid
+setup smoke tests. Normal delegated implementation uses the route pinned by the
+selected builder's own binding (`builders/<role>.json`, or `routing.json` for the
+legacy role); obey the user's data-sharing and spending restrictions. Installation
+is not evidence of a successful routed model request.
 <!-- END astra-flash-orchestrator managed policy -->
